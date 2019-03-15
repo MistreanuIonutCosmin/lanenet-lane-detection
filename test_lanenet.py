@@ -36,11 +36,11 @@ def init_args():
     :return:
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument('--image_path', type=str, help='The image path or the src image save dir')
-    parser.add_argument('--weights_path', type=str, help='The model weights path')
-    parser.add_argument('--is_batch', type=str, help='If test a batch of images', default='false')
+    parser.add_argument('--image_path', type=str, help='The image path or the src image save dir', default='/workspace/storage/projects/lanenet-lane-detection/data/tusimple_test_image')
+    parser.add_argument('--weights_path', type=str, help='The model weights path', default='/workspace/storage/projects/lanenet-lane-detection/weights/tusimple_lanenet_vgg_2018-10-19-13-33-56.ckpt-200000')
+    parser.add_argument('--is_batch', type=str, help='If test a batch of images', default='true')
     parser.add_argument('--batch_size', type=int, help='The batch size of the test images', default=32)
-    parser.add_argument('--save_dir', type=str, help='Test result image save dir', default=None)
+    parser.add_argument('--save_dir', type=str, help='Test result image save dir', default='/workspace/storage/projects/lanenet-lane-detection/data/output_test')
     parser.add_argument('--use_gpu', type=int, help='If use gpu set 1 or 0 instead', default=1)
 
     return parser.parse_args()
@@ -60,7 +60,7 @@ def minmax_scale(input_arr):
     return output_arr
 
 
-def test_lanenet(image_path, weights_path, use_gpu):
+def test_lanenet(image_path, weights_path, use_gpu, save_dir):
     """
 
     :param image_path:
@@ -127,6 +127,11 @@ def test_lanenet(image_path, weights_path, use_gpu):
         plt.figure('binary_image')
         plt.imshow(binary_seg_image[0] * 255, cmap='gray')
         plt.show()
+
+        mask_image = mask_image[:, :, (2, 1, 0)]
+        image_name = ops.split(image_path_epoch[index])[1]
+        image_save_path = ops.join(save_dir, image_name)
+        cv2.imwrite(image_save_path, mask_image)
 
     sess.close()
 
@@ -218,6 +223,8 @@ def test_lanenet_batch(image_dir, weights_path, batch_size, use_gpu, save_dir=No
                     plt.pause(3.0)
                     plt.show()
                     plt.ioff()
+
+
 
                 if save_dir is not None:
                     mask_image = cv2.addWeighted(image_vis_list[index], 1.0, mask_image, 1.0, 0)

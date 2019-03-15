@@ -90,7 +90,6 @@ class DataSet(object):
         else:
             gt_img_list = self._gt_img_list[idx_start:idx_end]
             gt_label_list = self._gt_label_list[idx_start:idx_end]
-
             gt_imgs = []
             gt_labels = []
 

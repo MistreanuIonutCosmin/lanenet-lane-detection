@@ -71,7 +71,7 @@ def train_net(dataset_dir, weights_path=None, net_flag='vgg'):
     train_dataset = lanenet_data_processor.DataSet(train_dataset_file)
     val_dataset = lanenet_data_processor.DataSet(val_dataset_file)
 
-    with tf.device('/gpu:1'):
+    with tf.device('/gpu:0'):
         input_tensor = tf.placeholder(dtype=tf.float32,
                                       shape=[CFG.TRAIN.BATCH_SIZE, CFG.TRAIN.IMG_HEIGHT,
                                              CFG.TRAIN.IMG_WIDTH, 3],

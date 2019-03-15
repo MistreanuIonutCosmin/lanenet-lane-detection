@@ -42,14 +42,14 @@ class LaneNetCluster(object):
         pass
 
     @staticmethod
-    def _cluster(prediction, bandwidth):
+    def _cluster(prediction, bandwidth, bin_seeding):
         """
         实现论文SectionⅡ的cluster部分
         :param prediction:
         :param bandwidth:
         :return:
         """
-        ms = MeanShift(bandwidth, bin_seeding=True)
+        ms = MeanShift(bandwidth, bin_seeding)
         # log.info('开始Mean shift聚类 ...')
         tic = time.time()
         try:
@@ -93,7 +93,10 @@ class LaneNetCluster(object):
         :param instance_seg_ret:
         :return:
         """
+
+        # X and Y coordinates in the mask where there is a 1 value
         idx = np.where(binary_seg_ret == 1)
+        print(len(idx[0]), len(idx[1]))
 
         lane_embedding_feats = []
         lane_coordinate = []
@@ -155,9 +158,13 @@ class LaneNetCluster(object):
         :param instance_seg_ret:
         :return:
         """
+
+        # lane_embedding_feats - list of values in the embedding mask
+        # lane_coordinate - [[x1,y1], [x2,y2] ... ] coresponding to 1 values in the binary mask
         lane_embedding_feats, lane_coordinate = self._get_lane_area(binary_seg_ret, instance_seg_ret)
 
-        num_clusters, labels, cluster_centers = self._cluster(lane_embedding_feats, bandwidth=1.5)
+        num_clusters, labels, cluster_centers = self._cluster(lane_embedding_feats, bandwidth=1.5, bin_seeding=True)
+        # num_clusters, labels, cluster_centers = self._cluster_v2(lane_embedding_feats)
 
         # 聚类簇超过八个则选择其中类内样本最多的八个聚类簇保留下来
         if num_clusters > 8:

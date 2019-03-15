@@ -101,6 +101,8 @@ class DataSet(object):
             gt_label_binary_list = self._gt_label_binary_list[idx_start:idx_end]
             gt_label_instance_list = self._gt_label_instance_list[idx_start:idx_end]
 
+            print(list(map(lambda x: x.split("/")[7].split("_")[0], gt_img_list)))
+
             gt_imgs = []
             gt_labels_binary = []
             gt_labels_instance = []
