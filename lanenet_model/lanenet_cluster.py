@@ -42,14 +42,14 @@ class LaneNetCluster(object):
         pass
 
     @staticmethod
-    def _cluster(prediction, bandwidth, bin_seeding):
+    def _cluster(prediction, bandwidth):
         """
         实现论文SectionⅡ的cluster部分
         :param prediction:
         :param bandwidth:
         :return:
         """
-        ms = MeanShift(bandwidth, bin_seeding)
+        ms = MeanShift(bandwidth, bin_seeding=True)
         # log.info('开始Mean shift聚类 ...')
         tic = time.time()
         try:
@@ -163,16 +163,19 @@ class LaneNetCluster(object):
         # lane_coordinate - [[x1,y1], [x2,y2] ... ] coresponding to 1 values in the binary mask
         lane_embedding_feats, lane_coordinate = self._get_lane_area(binary_seg_ret, instance_seg_ret)
 
-        num_clusters, labels, cluster_centers = self._cluster(lane_embedding_feats, bandwidth=1.5, bin_seeding=True)
-        # num_clusters, labels, cluster_centers = self._cluster_v2(lane_embedding_feats)
+        # num_clusters, labels, cluster_centers = self._cluster(lane_embedding_feats, bandwidth=1.5)
+        num_clusters, labels, cluster_centers = self._cluster_v2(lane_embedding_feats)
+
+        print("centers shape", cluster_centers)
 
         # 聚类簇超过八个则选择其中类内样本最多的八个聚类簇保留下来
-        if num_clusters > 8:
+        # take first 8 clusters ordered by size
+        if num_clusters > 4:
             cluster_sample_nums = []
             for i in range(num_clusters):
                 cluster_sample_nums.append(len(np.where(labels == i)[0]))
             sort_idx = np.argsort(-np.array(cluster_sample_nums, np.int64))
-            cluster_index = np.array(range(num_clusters))[sort_idx[0:8]]
+            cluster_index = np.array(range(num_clusters))[sort_idx[0:4]]
         else:
             cluster_index = range(num_clusters)
 
@@ -188,7 +191,9 @@ class LaneNetCluster(object):
                      int(self._color_map[index][1]),
                      int(self._color_map[index][2]))
             coord = np.array([coord])
+            # print("num of points from cluster", coord.shape)
             cv2.polylines(img=mask_image, pts=coord, isClosed=False, color=color, thickness=2)
+            # cv2.fillPoly(img=mask_image, pts=coord, color=color)
             # mask_image[coord] = color
 
         return mask_image
