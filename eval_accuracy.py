@@ -32,10 +32,13 @@ class LaneEval(object):
         if running_time > 200 or len(gt) + 2 < len(pred):
             return 0., 0., 1.
         angles = [LaneEval.get_angle(np.array(x_gts), np.array(y_samples)) for x_gts in gt]
+        plm = np.degrees(angles)
         threshs = [LaneEval.pixel_thresh / np.cos(angle) for angle in angles]
+
         line_accs = []
         fp, fn = 0., 0.
         matched = 0.
+
         for x_gts, thresh in zip(gt, threshs):
             accs = [LaneEval.line_accuracy(np.array(x_preds), np.array(x_gts), thresh) for x_preds in pred]
             max_acc = np.max(accs) if len(accs) > 0 else 0.
@@ -44,13 +47,14 @@ class LaneEval(object):
             else:
                 matched += 1
             line_accs.append(max_acc)
+
         fp = len(pred) - matched
         if len(gt) > 4 and fn > 0:
             fn -= 1
         s = sum(line_accs)
         if len(gt) > 4:
             s -= min(line_accs)
-        return s / max(min(4.0, len(gt)), 1.), fp / len(pred) if len(pred) > 0 else 0., fn / max(min(len(gt), 4.) , 1.)
+        return s / max(min(4.0, len(gt)), 1.), fp / len(pred) if len(pred) > 0 else 0., fn / max(min(len(gt), 4.), 1.)
 
     @staticmethod
     def bench_one_submit(pred_file, gt_file):
@@ -59,22 +63,22 @@ class LaneEval(object):
         except BaseException as e:
             raise Exception('Fail to load json file of the prediction.')
         json_gt = [json.loads(line) for line in open(gt_file).readlines()]
-        if len(json_gt) != len(json_pred):
-            raise Exception('We do not get the predictions of all the test tasks')
+        # if len(json_gt) != len(json_pred):
+        #     raise Exception('We do not get the predictions of all the test tasks')
         gts = {l['raw_file']: l for l in json_gt}
         accuracy, fp, fn = 0., 0., 0.
         for pred in json_pred:
-            if 'raw_file' not in pred or 'lanes' not in pred:
+            if 'raw_file' not in pred or 'lines' not in pred:
                 raise Exception('raw_file or lanes or run_time not in some predictions.')
             raw_file = pred['raw_file']
-            pred_lanes = pred['lanes']
+            pred_lanes = pred['lines']
 
-            # if you want to tes this change hardcoded value
+            # if you want to test this change hardcoded value
             run_time = 1
             if raw_file not in gts:
                 raise Exception('Some raw_file from your predictions do not exist in the test tasks.')
             gt = gts[raw_file]
-            gt_lanes = gt['lanes']
+            gt_lanes = gt['lines']
             y_samples = gt['h_samples']
             try:
                 a, p, n = LaneEval.bench(pred_lanes, gt_lanes, y_samples, run_time)
@@ -83,7 +87,7 @@ class LaneEval(object):
             accuracy += a
             fp += p
             fn += n
-        num = len(gts)
+        num = len(json_pred)
         # the first return parameter is the default ranking parameter
         return json.dumps([
             {'name': 'Accuracy', 'value': accuracy / num, 'order': 'desc'},
