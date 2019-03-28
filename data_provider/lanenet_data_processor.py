@@ -77,10 +77,11 @@ class DataSet(object):
         self._gt_label_binary_list = new_gt_label_binary_list
         self._gt_label_instance_list = new_gt_label_instance_list
 
-    def next_batch(self, batch_size):
+    def next_batch(self, batch_size, ignore_label):
         """
 
         :param batch_size:
+        :param ignore_label:
         :return:
         """
         assert len(self._gt_label_binary_list) == len(self._gt_label_instance_list) \
@@ -89,19 +90,21 @@ class DataSet(object):
         idx_start = batch_size * self._next_batch_loop_count
         idx_end = batch_size * self._next_batch_loop_count + batch_size
 
+        # print(batch_size, idx_start, idx_end, len(self._gt_label_binary_list))
+
         if idx_start == 0 and idx_end > len(self._gt_label_binary_list):
-            raise ValueError('Batch size不能大于样本的总数量')
+            raise ValueError('Batch size is greater than the total number of samples')
 
         if idx_end > len(self._gt_label_binary_list):
             self._random_dataset()
             self._next_batch_loop_count = 0
-            return self.next_batch(batch_size)
+            return self.next_batch(batch_size, ignore_label)
         else:
             gt_img_list = self._gt_img_list[idx_start:idx_end]
             gt_label_binary_list = self._gt_label_binary_list[idx_start:idx_end]
             gt_label_instance_list = self._gt_label_instance_list[idx_start:idx_end]
 
-            print(list(map(lambda x: x.split("/")[7].split("_")[0], gt_img_list)))
+            # print(list(map(lambda x: x.split("/")[7].split("_")[0], gt_img_list)))
 
             gt_imgs = []
             gt_labels_binary = []
@@ -113,8 +116,13 @@ class DataSet(object):
             for gt_label_path in gt_label_binary_list:
                 label_img = cv2.imread(gt_label_path, cv2.IMREAD_COLOR)
                 label_binary = np.zeros([label_img.shape[0], label_img.shape[1]], dtype=np.uint8)
+
                 idx = np.where((label_img[:, :, :] != [0, 0, 0]).all(axis=2))
                 label_binary[idx] = 1
+
+                idx = np.where((ignore_label[:, :, :] == [0, 0, 0]).all(axis=2))
+                label_binary[idx] = 255
+
                 gt_labels_binary.append(label_binary)
 
             for gt_label_path in gt_label_instance_list:

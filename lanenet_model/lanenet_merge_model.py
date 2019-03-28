@@ -8,6 +8,8 @@
 """
 实现LaneNet模型
 """
+# from __future__ import print_function
+
 import tensorflow as tf
 
 from encoder_decoder_model import vgg_encoder
@@ -21,6 +23,7 @@ class LaneNet(cnn_basenet.CNNBaseModel):
     """
     实现语义分割模型
     """
+
     def __init__(self, phase, net_flag='vgg'):
         """
 
@@ -74,7 +77,7 @@ class LaneNet(cnn_basenet.CNNBaseModel):
                                                                      'Dense_Block_3'])
                 return decode_ret
 
-    def compute_loss(self, input_tensor, binary_label, instance_label, name):
+    def compute_loss(self, input_tensor, binary_label, instance_label, ignore_label, name):
         """
         计算LaneNet模型损失函数
         :param input_tensor:
@@ -88,20 +91,38 @@ class LaneNet(cnn_basenet.CNNBaseModel):
             inference_ret = self._build_model(input_tensor=input_tensor, name='inference')
             # 计算二值分割损失函数
             decode_logits = inference_ret['logits']
+
+            zeros = tf.zeros(tf.shape(binary_label))
+            zeros = tf.cast(zeros, tf.int64)
+            binary_label_f = tf.where(tf.equal(binary_label, ignore_label), zeros, binary_label)
+
             binary_label_plain = tf.reshape(
-                binary_label,
-                shape=[binary_label.get_shape().as_list()[0] *
-                       binary_label.get_shape().as_list()[1] *
-                       binary_label.get_shape().as_list()[2]])
+                binary_label_f,
+                shape=[binary_label_f.get_shape().as_list()[0] *
+                       binary_label_f.get_shape().as_list()[1] *
+                       binary_label_f.get_shape().as_list()[2]])
             # 加入class weights
             unique_labels, unique_id, counts = tf.unique_with_counts(binary_label_plain)
             counts = tf.cast(counts, tf.float32)
             inverse_weights = tf.divide(1.0,
                                         tf.log(tf.add(tf.divide(tf.constant(1.0), counts),
                                                       tf.constant(1.02))))
+
+            # unique_inverse_val, _ = tf.unique(inverse_weights)
+            # ignore_label = tf.cast(ignore_label, tf.float32)
+
             inverse_weights = tf.gather(inverse_weights, binary_label)
+            zeros = tf.zeros(tf.shape(inverse_weights))
+            inverse_weights = tf.where(binary_label == ignore_label, zeros, inverse_weights)
+
+            # debug code start
+            # unique_labels, unique_id, counts = tf.unique_with_counts(tf.reshape(inverse_weights, shape=[-1]))
+            # inverse_weights = tf.Print(inverse_weights, [tf.shape(inverse_weights), unique_labels, counts],
+            #                            message="inverse_weights values: ")
+            # debug code end
+
             binary_segmenatation_loss = tf.losses.sparse_softmax_cross_entropy(
-                labels=binary_label, logits=decode_logits, weights=inverse_weights)
+                labels=binary_label_f, logits=decode_logits, weights=inverse_weights)
             binary_segmenatation_loss = tf.reduce_mean(binary_segmenatation_loss)
 
             # 计算discriminative loss损失函数

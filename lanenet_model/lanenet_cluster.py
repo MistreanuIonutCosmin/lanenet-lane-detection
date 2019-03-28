@@ -96,7 +96,7 @@ class LaneNetCluster(object):
 
         # X and Y coordinates in the mask where there is a 1 value
         idx = np.where(binary_seg_ret == 1)
-        print(len(idx[0]), len(idx[1]))
+        # print(len(idx[0]), len(idx[1]))
 
         lane_embedding_feats = []
         lane_coordinate = []
@@ -166,16 +166,29 @@ class LaneNetCluster(object):
         # num_clusters, labels, cluster_centers = self._cluster(lane_embedding_feats, bandwidth=1.5)
         num_clusters, labels, cluster_centers = self._cluster_v2(lane_embedding_feats)
 
-        print("centers shape", cluster_centers)
+        # print("centers shape", cluster_centers)
+
+        # for center in cluster_centers:
+        #     # for i in range(len(lane_embedding_feats)):
+        #     #     if lane_embedding_feats[:, i] == center.all():
+        #     #         print("Centroid: ", i)
+        #
+        #     z = [i for i in zip(range(len(lane_embedding_feats)), lane_embedding_feats)]
+        #     if center in lane_embedding_feats:
+        #         ind = [i for i, c in z if np.array_equal(c, center)]
+        #         # print(center)
+        #         print(ind)
+        #         # print(lane_embedding_feats)
+        #         print("Centroid: ", center, lane_coordinate[ind])
 
         # 聚类簇超过八个则选择其中类内样本最多的八个聚类簇保留下来
         # take first 8 clusters ordered by size
-        if num_clusters > 4:
+        if num_clusters > 5:
             cluster_sample_nums = []
             for i in range(num_clusters):
                 cluster_sample_nums.append(len(np.where(labels == i)[0]))
             sort_idx = np.argsort(-np.array(cluster_sample_nums, np.int64))
-            cluster_index = np.array(range(num_clusters))[sort_idx[0:4]]
+            cluster_index = np.array(range(num_clusters))[sort_idx[0:5]]
         else:
             cluster_index = range(num_clusters)
 

@@ -49,13 +49,17 @@ class LaneEval(object):
             line_accs.append(max_acc)
 
         fp = len(pred) - matched
+        tp = matched
         if len(gt) > 4 and fn > 0:
             fn -= 1
         s = sum(line_accs)
         if len(gt) > 4:
             s -= min(line_accs)
-        return s / max(min(4.0, len(gt)), 1.), fp / len(pred) if len(pred) > 0 else 0., fn / max(min(len(gt), 4.), 1.)
+        # return s / max(min(4.0, len(gt)), 1.), fp / len(pred) if len(pred) > 0 else 0., \
+        #        fn / max(min(len(gt), 4.), 1.), tp / len(pred) if len(pred) > 0 else 0.
 
+        return s / max(min(4.0, len(gt)), 1.), fp, \
+               fn, tp
     @staticmethod
     def bench_one_submit(pred_file, gt_file):
         try:
@@ -66,7 +70,9 @@ class LaneEval(object):
         # if len(json_gt) != len(json_pred):
         #     raise Exception('We do not get the predictions of all the test tasks')
         gts = {l['raw_file']: l for l in json_gt}
-        accuracy, fp, fn = 0., 0., 0.
+        accuracy, FP, FN = 0., 0., 0.
+
+        TP, precision, recall = 0., 0., 0.
         for pred in json_pred:
             if 'raw_file' not in pred or 'lines' not in pred:
                 raise Exception('raw_file or lanes or run_time not in some predictions.')
@@ -81,23 +87,31 @@ class LaneEval(object):
             gt_lanes = gt['lines']
             y_samples = gt['h_samples']
             try:
-                a, p, n = LaneEval.bench(pred_lanes, gt_lanes, y_samples, run_time)
+                a, fp, fn, tp = LaneEval.bench(pred_lanes, gt_lanes, y_samples, run_time)
             except BaseException as e:
                 raise Exception('Format of lanes error.')
             accuracy += a
-            fp += p
-            fn += n
+            TP += tp
+            FP += fp
+            FN += fn
         num = len(json_pred)
+        precision = TP / (TP + FP)
+        recall = TP / (TP + FN)
         # the first return parameter is the default ranking parameter
-        return json.dumps([
-            {'name': 'Accuracy', 'value': accuracy / num, 'order': 'desc'},
-            {'name': 'FP', 'value': fp / num, 'order': 'asc'},
-            {'name': 'FN', 'value': fn / num, 'order': 'asc'}
-        ])
+        return [
+            {'name': 'Accuracy', 'value': accuracy / num},
+            {'name': 'Precision', 'value': precision},
+            {'name': 'Recall', 'value': recall},
+            {'name': 'F1', 'value': 2 * precision * recall / (precision + recall)},
+            {'name': 'TP', 'value': TP},
+            {'name': 'FP', 'value': FP},
+            {'name': 'FN', 'value': FN}
+        ]
 
 
 if __name__ == '__main__':
     import sys
+
     try:
         if len(sys.argv) != 3:
             raise Exception('Invalid input arguments')
