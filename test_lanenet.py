@@ -25,6 +25,7 @@ from lanenet_model import lanenet_merge_model
 from lanenet_model import lanenet_cluster
 from lanenet_model import lanenet_postprocess
 from config import global_config
+from correct_path_saver import restore_from_classification_checkpoint_fn, get_variables_available_in_checkpoint
 
 CFG = global_config.cfg
 VGG_MEAN = [103.939, 116.779, 123.68]
@@ -36,11 +37,14 @@ def init_args():
     :return:
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument('--image_path', type=str, help='The image path or the src image save dir', default='/workspace/storage/projects/lanenet-lane-detection/data/tusimple_test_image')
-    parser.add_argument('--weights_path', type=str, help='The model weights path', default='/workspace/storage/projects/lanenet-lane-detection/weights/tusimple_lanenet_vgg_2018-10-19-13-33-56.ckpt-200000')
+    parser.add_argument('--image_path', type=str, help='The image path or the src image save dir',
+                        default='/media/remus/datasets/AVMSnapshots/AVM/val_images')
+    parser.add_argument('--weights_path', type=str, help='The model weights path',
+                        default='/home/remusm/projects/laneNet/model/mobilenetV2/mobilenet_lanenet_2019-04-08-18-39-05.ckpt-6000')
     parser.add_argument('--is_batch', type=str, help='If test a batch of images', default='true')
-    parser.add_argument('--batch_size', type=int, help='The batch size of the test images', default=32)
-    parser.add_argument('--save_dir', type=str, help='Test result image save dir', default='/workspace/storage/projects/lanenet-lane-detection/data/output_test')
+    parser.add_argument('--batch_size', type=int, help='The batch size of the test images', default=8)
+    parser.add_argument('--save_dir', type=str, help='Test result image save dir',
+                        default='/media/remus/datasets/AVMSnapshots/AVM/mobilenet_output_test')
     parser.add_argument('--use_gpu', type=int, help='If use gpu set 1 or 0 instead', default=1)
 
     return parser.parse_args()
@@ -81,12 +85,19 @@ def test_lanenet(image_path, weights_path, use_gpu, save_dir):
     input_tensor = tf.placeholder(dtype=tf.float32, shape=[1, 256, 512, 3], name='input_tensor')
     phase_tensor = tf.constant('test', tf.string)
 
-    net = lanenet_merge_model.LaneNet(phase=phase_tensor, net_flag='vgg')
+    net = lanenet_merge_model.LaneNet(phase=phase_tensor, net_flag='mobilenet')
     binary_seg_ret, instance_seg_ret = net.inference(input_tensor=input_tensor, name='lanenet_model')
 
     cluster = lanenet_cluster.LaneNetCluster()
     postprocessor = lanenet_postprocess.LaneNetPoseProcessor()
 
+    # Set tf saver
+    # if weights_path is not None:
+    #     var_map = restore_from_classification_checkpoint_fn("lanenet_model/inference")
+    #     available_var_map = (get_variables_available_in_checkpoint(
+    #         var_map, weights_path, include_global_step=False))
+    #
+    #     saver = tf.train.Saver(available_var_map)
     saver = tf.train.Saver()
 
     # Set sess configuration
@@ -129,7 +140,7 @@ def test_lanenet(image_path, weights_path, use_gpu, save_dir):
         plt.show()
 
         mask_image = mask_image[:, :, (2, 1, 0)]
-        image_name = ops.split(image_path_epoch[index])[1]
+        image_name = ops.split(image_path)[1]
         image_save_path = ops.join(save_dir, image_name)
         cv2.imwrite(image_save_path, mask_image)
 
@@ -158,12 +169,19 @@ def test_lanenet_batch(image_dir, weights_path, batch_size, use_gpu, save_dir=No
     input_tensor = tf.placeholder(dtype=tf.float32, shape=[None, 256, 512, 3], name='input_tensor')
     phase_tensor = tf.constant('test', tf.string)
 
-    net = lanenet_merge_model.LaneNet(phase=phase_tensor, net_flag='vgg')
+    net = lanenet_merge_model.LaneNet(phase=phase_tensor, net_flag='mobilenet')
     binary_seg_ret, instance_seg_ret = net.inference(input_tensor=input_tensor, name='lanenet_model')
 
     cluster = lanenet_cluster.LaneNetCluster()
     postprocessor = lanenet_postprocess.LaneNetPoseProcessor()
 
+    # Set tf saver
+    # if weights_path is not None:
+    #     var_map = restore_from_classification_checkpoint_fn("")
+    #     available_var_map = (get_variables_available_in_checkpoint(
+    #         var_map, weights_path, include_global_step=False))
+    #
+    #     saver = tf.train.Saver(available_var_map)
     saver = tf.train.Saver()
 
     # Set sess configuration
@@ -223,8 +241,6 @@ def test_lanenet_batch(image_dir, weights_path, batch_size, use_gpu, save_dir=No
                     plt.pause(3.0)
                     plt.show()
                     plt.ioff()
-
-
 
                 if save_dir is not None:
                     mask_image = cv2.addWeighted(image_vis_list[index], 1.0, mask_image, 1.0, 0)

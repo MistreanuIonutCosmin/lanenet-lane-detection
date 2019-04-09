@@ -13,6 +13,7 @@
 import tensorflow as tf
 
 from encoder_decoder_model import vgg_encoder
+from encoder_decoder_model import mobilenet_encoder
 from encoder_decoder_model import fcn_decoder
 from encoder_decoder_model import dense_encoder
 from encoder_decoder_model import cnn_basenet
@@ -33,6 +34,8 @@ class LaneNet(cnn_basenet.CNNBaseModel):
         self._phase = phase
         if self._net_flag == 'vgg':
             self._encoder = vgg_encoder.VGG16Encoder(phase=phase)
+        elif self._net_flag == 'mobilenet':
+            self._encoder = mobilenet_encoder.Mobilenet(phase=phase)
         elif self._net_flag == 'dense':
             self._encoder = dense_encoder.DenseEncoder(l=20, growthrate=8,
                                                        with_bc=True,
@@ -75,6 +78,12 @@ class LaneNet(cnn_basenet.CNNBaseModel):
                                                   decode_layer_list=['Dense_Block_5',
                                                                      'Dense_Block_4',
                                                                      'Dense_Block_3'])
+            elif self._net_flag.lower() == 'mobilenet':
+                decode_ret = self._decoder.decode(input_tensor_dict=encode_ret,
+                                                  name='decode',
+                                                  decode_layer_list=['layer_18',
+                                                                     'layer_14',
+                                                                     'layer_7'])
                 return decode_ret
 
     def compute_loss(self, input_tensor, binary_label, instance_label, ignore_label, name):

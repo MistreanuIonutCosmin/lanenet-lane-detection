@@ -32,7 +32,6 @@ class LaneEval(object):
         if running_time > 200 or len(gt) + 2 < len(pred):
             return 0., 0., 1.
         angles = [LaneEval.get_angle(np.array(x_gts), np.array(y_samples)) for x_gts in gt]
-        plm = np.degrees(angles)
         threshs = [LaneEval.pixel_thresh / np.cos(angle) for angle in angles]
 
         line_accs = []
@@ -48,8 +47,9 @@ class LaneEval(object):
                 matched += 1
             line_accs.append(max_acc)
 
-        fp = len(pred) - matched
-        tp = matched
+        fp = len(pred) - matched if len(pred) >= matched else 0.
+        tp = matched if len(pred) >= matched else float(len(pred))
+
         if len(gt) > 4 and fn > 0:
             fn -= 1
         s = sum(line_accs)
@@ -106,6 +106,9 @@ class LaneEval(object):
             {'name': 'TP', 'value': TP},
             {'name': 'FP', 'value': FP},
             {'name': 'FN', 'value': FN}
+            # {'name': 'TP', 'value': TP / num},
+            # {'name': 'FP', 'value': FP / num},
+            # {'name': 'FN', 'value': FN / num}
         ]
 
 
