@@ -147,14 +147,27 @@ class LaneNet(cnn_basenet.CNNBaseModel):
                     pix_embedding, instance_label, 4, image_shape, 0.5, 3.0, 1.0, 1.0, 0.001)
 
             # 合并损失
-            l2_reg_loss = tf.constant(0.0, tf.float32)
-            for vv in tf.trainable_variables():
-                if 'bn' in vv.name:
-                    continue
-                else:
-                    l2_reg_loss = tf.add(l2_reg_loss, tf.nn.l2_loss(vv))
-            l2_reg_loss *= 0.001
-            total_loss = 0.5 * binary_segmenatation_loss + 0.5 * disc_loss + l2_reg_loss
+            if self._net_flag != "mobilenet":
+                # bad way to do reg loss
+                l2_reg_loss = tf.constant(0.0, tf.float32)
+                for vv in tf.trainable_variables():
+                    if 'bn' in vv.name:
+                        continue
+                    else:
+                        l2_reg_loss = tf.add(l2_reg_loss, tf.nn.l2_loss(vv))
+                l2_reg_loss *= 0.001
+                total_loss = 0.5 * binary_segmenatation_loss + 0.5 * disc_loss + l2_reg_loss
+
+            elif self._net_flag == "mobilenet":
+                reg_losses = tf.contrib.slim.losses.get_regularization_losses()
+                reg_loss = tf.add_n(reg_losses, name="reg_loss")
+
+                tf.losses.add_loss(binary_segmenatation_loss, "binary_segmenatation_loss")
+                tf.losses.add_loss(disc_loss, "disc_loss")
+                tf.losses.add_loss(reg_loss, "reg_loss")
+
+                total_loss = 0.5 * binary_segmenatation_loss + 0.5 * disc_loss + reg_loss * 0.001
+                tf.losses.add_loss(total_loss, "total_loss")
 
             ret = {
                 'total_loss': total_loss,

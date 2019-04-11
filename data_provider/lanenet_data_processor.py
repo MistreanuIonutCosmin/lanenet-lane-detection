@@ -111,7 +111,10 @@ class DataSet(object):
             gt_labels_instance = []
 
             for gt_img_path in gt_img_list:
-                gt_imgs.append(cv2.imread(gt_img_path, cv2.IMREAD_COLOR))
+                gt_img = cv2.imread(gt_img_path, cv2.IMREAD_COLOR)
+                # @vlad.paunescu reverse BGR2RGB
+                gt_img = gt_img[:, :, ::-1]
+                gt_imgs.append(gt_img)
 
             for gt_label_path in gt_label_binary_list:
                 label_img = cv2.imread(gt_label_path, cv2.IMREAD_COLOR)
