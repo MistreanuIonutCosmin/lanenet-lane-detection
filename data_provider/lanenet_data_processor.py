@@ -77,11 +77,11 @@ class DataSet(object):
         self._gt_label_binary_list = new_gt_label_binary_list
         self._gt_label_instance_list = new_gt_label_instance_list
 
-    def next_batch(self, batch_size, ignore_label):
+    def next_batch(self, batch_size, ignore_label_mask, ignore_label=255):
         """
 
         :param batch_size:
-        :param ignore_label:
+        :param ignore_label_mask:
         :return:
         """
         assert len(self._gt_label_binary_list) == len(self._gt_label_instance_list) \
@@ -98,7 +98,7 @@ class DataSet(object):
         if idx_end > len(self._gt_label_binary_list):
             self._random_dataset()
             self._next_batch_loop_count = 0
-            return self.next_batch(batch_size, ignore_label)
+            return self.next_batch(batch_size, ignore_label_mask)
         else:
             gt_img_list = self._gt_img_list[idx_start:idx_end]
             gt_label_binary_list = self._gt_label_binary_list[idx_start:idx_end]
@@ -123,8 +123,8 @@ class DataSet(object):
                 idx = np.where((label_img[:, :, :] != [0, 0, 0]).all(axis=2))
                 label_binary[idx] = 1
 
-                idx = np.where((ignore_label[:, :, :] == [0, 0, 0]).all(axis=2))
-                label_binary[idx] = 255
+                idx = np.where((ignore_label_mask[:, :, :] == [0, 0, 0]).all(axis=2))
+                label_binary[idx] = ignore_label
 
                 gt_labels_binary.append(label_binary)
 

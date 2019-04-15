@@ -40,7 +40,7 @@ def init_args():
     parser.add_argument('--image_path', type=str, help='The image path or the src image save dir',
                         default='/media/remus/datasets/AVMSnapshots/AVM/val_images')
     parser.add_argument('--weights_path', type=str, help='The model weights path',
-                        default='/home/remusm/projects/laneNet/model/mobilenetV2/mobilenet_lanenet_2019-04-08-18-39-05.ckpt-6000')
+                        default='/home/remusm/projects/laneNet/model/mobilenet_vlad/mobilenet_lanenet_2019-04-09-22-47-33.ckpt-84000')
     parser.add_argument('--is_batch', type=str, help='If test a batch of images', default='true')
     parser.add_argument('--batch_size', type=int, help='The batch size of the test images', default=8)
     parser.add_argument('--save_dir', type=str, help='Test result image save dir',
@@ -79,7 +79,7 @@ def test_lanenet(image_path, weights_path, use_gpu, save_dir):
     image = cv2.imread(image_path, cv2.IMREAD_COLOR)
     image_vis = image
     image = cv2.resize(image, (512, 256), interpolation=cv2.INTER_LINEAR)
-    image = image - VGG_MEAN
+    image = image / 128.0 - 1.0
     log.info('图像读取完毕, 耗时: {:.5f}s'.format(time.time() - t_start))
 
     input_tensor = tf.placeholder(dtype=tf.float32, shape=[1, 256, 512, 3], name='input_tensor')
@@ -102,7 +102,7 @@ def test_lanenet(image_path, weights_path, use_gpu, save_dir):
 
     # Set sess configuration
     if use_gpu:
-        sess_config = tf.ConfigProto(device_count={'GPU': 1})
+        sess_config = tf.ConfigProto(device_count={'GPU': 0})
     else:
         sess_config = tf.ConfigProto(device_count={'CPU': 0})
     sess_config.gpu_options.per_process_gpu_memory_fraction = CFG.TEST.GPU_MEMORY_FRACTION
@@ -186,12 +186,15 @@ def test_lanenet_batch(image_dir, weights_path, batch_size, use_gpu, save_dir=No
 
     # Set sess configuration
     if use_gpu:
-        sess_config = tf.ConfigProto(device_count={'GPU': 1})
-    else:
         sess_config = tf.ConfigProto(device_count={'GPU': 0})
+    else:
+        sess_config = tf.ConfigProto(device_count={'CPU': 0})
     sess_config.gpu_options.per_process_gpu_memory_fraction = CFG.TEST.GPU_MEMORY_FRACTION
     sess_config.gpu_options.allow_growth = CFG.TRAIN.TF_ALLOW_GROWTH
     sess_config.gpu_options.allocator_type = 'BFC'
+
+    ignore_labels = cv2.imread('/media/remus/datasets/AVMSnapshots/AVM/ignore_labels.png')
+    ignore_labels = cv2.cvtColor(ignore_labels, cv2.COLOR_BGR2GRAY)
 
     sess = tf.Session(config=sess_config)
 
@@ -202,35 +205,43 @@ def test_lanenet_batch(image_dir, weights_path, batch_size, use_gpu, save_dir=No
         epoch_nums = int(math.ceil(len(image_path_list) / batch_size))
 
         for epoch in range(epoch_nums):
-            log.info('[Epoch:{:d}] 开始图像读取和预处理...'.format(epoch))
+            log.info('[Epoch:{:d}] starts image reading and preprocessing...'.format(epoch))
             t_start = time.time()
             image_path_epoch = image_path_list[epoch * batch_size:(epoch + 1) * batch_size]
             image_list_epoch = [cv2.imread(tmp, cv2.IMREAD_COLOR) for tmp in image_path_epoch]
             image_vis_list = image_list_epoch
             image_list_epoch = [cv2.resize(tmp, (512, 256), interpolation=cv2.INTER_LINEAR)
                                 for tmp in image_list_epoch]
-            image_list_epoch = [tmp - VGG_MEAN for tmp in image_list_epoch]
+            image_list_epoch = [tmp / 128.0 - 1.0 for tmp in image_list_epoch]
             t_cost = time.time() - t_start
-            log.info('[Epoch:{:d}] 预处理{:d}张图像, 共耗时: {:.5f}s, 平均每张耗时: {:.5f}'.format(
+            log.info('[Epoch:{:d}] preprocesses {:d} images, total time: {:.5f}s, average time per sheet: {:.5f}'.format(
                 epoch, len(image_path_epoch), t_cost, t_cost / len(image_path_epoch)))
 
             t_start = time.time()
             binary_seg_images, instance_seg_images = sess.run(
                 [binary_seg_ret, instance_seg_ret], feed_dict={input_tensor: image_list_epoch})
             t_cost = time.time() - t_start
-            log.info('[Epoch:{:d}] 预测{:d}张图像车道线, 共耗时: {:.5f}s, 平均每张耗时: {:.5f}s'.format(
-                epoch, len(image_path_epoch), t_cost, t_cost / len(image_path_epoch)))
+            log.info(
+                '[Epoch:{:d}] predicts {:d} image lane lines, total time: {:.5f}s, average time per sheet: {:.5f}s'.format(
+                    epoch, len(image_path_epoch), t_cost, t_cost / len(image_path_epoch)))
 
             cluster_time = []
             for index, binary_seg_image in enumerate(binary_seg_images):
                 t_start = time.time()
+                binary_seg_image[ignore_labels == 0] = 0
                 binary_seg_image = postprocessor.postprocess(binary_seg_image)
                 mask_image = cluster.get_lane_mask(binary_seg_ret=binary_seg_image,
                                                    instance_seg_ret=instance_seg_images[index])
                 cluster_time.append(time.time() - t_start)
                 mask_image = cv2.resize(mask_image, (image_vis_list[index].shape[1],
                                                      image_vis_list[index].shape[0]),
-                                        interpolation=cv2.INTER_LINEAR)
+                                        interpolation=cv2.INTER_NEAREST)
+
+                _instance_seg_images = np.copy(instance_seg_images)
+
+                for i in range(4):
+                    _instance_seg_images[index][:, :, i] = minmax_scale(instance_seg_images[index][:, :, i])
+                    _embedding_image = np.array(_instance_seg_images[index], np.uint8)
 
                 if save_dir is None:
                     plt.ion()
@@ -243,13 +254,18 @@ def test_lanenet_batch(image_dir, weights_path, batch_size, use_gpu, save_dir=No
                     plt.ioff()
 
                 if save_dir is not None:
-                    mask_image = cv2.addWeighted(image_vis_list[index], 1.0, mask_image, 1.0, 0)
+                    # mask_image = cv2.addWeighted(image_vis_list[index], 1.0, mask_image, 1.0, 0)
                     image_name = ops.split(image_path_epoch[index])[1]
-                    image_save_path = ops.join(save_dir, image_name)
+                    image_save_path = ops.join(save_dir + "/image", image_name)
+                    mask_save_path = ops.join(save_dir + "/mask", image_name)
+                    embedding_save_path = ops.join(save_dir + "/embedding", image_name)
+                    cv2.imwrite(mask_save_path, binary_seg_image * 255)
                     cv2.imwrite(image_save_path, mask_image)
+                    cv2.imwrite(embedding_save_path, _embedding_image[:, :, (2, 1, 0)])
 
-            log.info('[Epoch:{:d}] 进行{:d}张图像车道线聚类, 共耗时: {:.5f}s, 平均每张耗时: {:.5f}'.format(
-                epoch, len(image_path_epoch), np.sum(cluster_time), np.mean(cluster_time)))
+            log.info(
+                '[Epoch:{:d}] performs {:d} image lane line clustering, which takes a total of time: {:.5f}s, average time per sheet: {:.5f}'.format(
+                    epoch, len(image_path_epoch), np.sum(cluster_time), np.mean(cluster_time)))
 
     sess.close()
 
@@ -262,7 +278,15 @@ if __name__ == '__main__':
 
     if args.save_dir is not None and not ops.exists(args.save_dir):
         log.error('{:s} not exist and has been made'.format(args.save_dir))
+        image_save_path = ops.join(args.save_dir + "/image")
+        mask_save_path = ops.join(args.save_dir + "/mask")
+        embedding_save_path = ops.join(args.save_dir + "/embedding")
         os.makedirs(args.save_dir)
+        os.makedirs(image_save_path)
+        os.makedirs(mask_save_path)
+        os.makedirs(embedding_save_path)
+
+
 
     if args.is_batch.lower() == 'false':
         # test hnet model on single image

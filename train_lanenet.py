@@ -38,7 +38,12 @@ def init_args():
     parser.add_argument('--dataset_dir', type=str, help='The training dataset dir path')
     parser.add_argument('--net', type=str, help='Which base net work to use', default='mobilenet')
     parser.add_argument('--weights_path', type=str, help='The pretrained weights path')
-    parser.add_argument('--model_save_dir', type=str, help='model save dir', default='./logs/train/mobilenet_1')
+    parser.add_argument('--my_checkpoint', type=str,
+                        help='If the checkpoints is saved by me or not (different variable names)', default="true")
+    parser.add_argument('--model_save_dir', type=str, help='model save dir', default='./model/mobilenetV2')
+    parser.add_argument('--tboard_save_dir', type=str, help='model save dir', default='./tboard/mobilenetV2')
+    parser.add_argument('--ignore_labels_path', type=str, help='path to ignore labels mask',
+                        default='./ignore_labels.png')
 
     return parser.parse_args()
 
@@ -57,9 +62,15 @@ def minmax_scale(input_arr):
     return output_arr
 
 
-def train_net(dataset_dir, weights_path=None, net_flag='vgg', save_dir="./logs/train/lanenet"):
+def train_net(dataset_dir, weights_path=None, net_flag='vgg', save_dir="./logs/train/lanenet",
+              tboard_save_path="./tboard/lanenet",
+              ignore_labels_path="/media/remus/datasets/AVMSnapshots/AVM/ignore_labels.png",
+              my_checkpoint="true"):
     """
 
+    :param save_dir:
+    :param ignore_labels_path:
+    :param tboard_save_path:
     :param dataset_dir:
     :param net_flag: choose which base network to use
     :param weights_path:
@@ -69,6 +80,7 @@ def train_net(dataset_dir, weights_path=None, net_flag='vgg', save_dir="./logs/t
     val_dataset_file = ops.join(dataset_dir, 'val.txt')
 
     assert ops.exists(train_dataset_file)
+    # tf.enable_eager_execution()
 
     train_dataset = lanenet_data_processor.DataSet(train_dataset_file)
     val_dataset = lanenet_data_processor.DataSet(val_dataset_file)
@@ -120,15 +132,19 @@ def train_net(dataset_dir, weights_path=None, net_flag='vgg', save_dir="./logs/t
                                                                     var_list=tf.trainable_variables(),
                                                                     global_step=global_step)
 
-    from correct_path_saver import restore_from_classification_checkpoint_fn, get_variables_available_in_checkpoint
     # Set tf saver
-    if weights_path is not None:
-        var_map = restore_from_classification_checkpoint_fn("lanenet_model/inference")
-        available_var_map = (get_variables_available_in_checkpoint(
-            var_map, weights_path, include_global_step=False))
 
-        init_saver = tf.train.Saver(available_var_map)
-    #
+    if my_checkpoint == "true":
+        init_saver = tf.train.Saver()
+
+    else:
+        from correct_path_saver import restore_from_classification_checkpoint_fn, get_variables_available_in_checkpoint
+        if weights_path is not None:
+            var_map = restore_from_classification_checkpoint_fn("lanenet_model/inference")
+            available_var_map = (get_variables_available_in_checkpoint(
+                var_map, weights_path, include_global_step=False))
+
+            init_saver = tf.train.Saver(available_var_map)
 
     if not ops.exists(save_dir):
         os.makedirs(save_dir)
@@ -138,7 +154,6 @@ def train_net(dataset_dir, weights_path=None, net_flag='vgg', save_dir="./logs/t
     model_save_path = ops.join(save_dir, model_name)
 
     # Set tf summary
-    tboard_save_path = 'tboard/mobilenetV2/{:s}'.format(net_flag)
     if not ops.exists(tboard_save_path):
         os.makedirs(tboard_save_path)
     train_cost_scalar = tf.summary.scalar(name='train_cost', tensor=total_loss)
@@ -161,6 +176,7 @@ def train_net(dataset_dir, weights_path=None, net_flag='vgg', save_dir="./logs/t
     sess_config.gpu_options.per_process_gpu_memory_fraction = CFG.TRAIN.GPU_MEMORY_FRACTION
     sess_config.gpu_options.allow_growth = CFG.TRAIN.TF_ALLOW_GROWTH
     sess_config.gpu_options.allocator_type = 'BFC'
+    # sess_config.device_count = {'GPU': 0}
 
     sess = tf.Session(config=sess_config)
 
@@ -174,6 +190,7 @@ def train_net(dataset_dir, weights_path=None, net_flag='vgg', save_dir="./logs/t
     tf.logging.info(CFG)
 
     saver = tf.train.Saver(max_to_keep=40)
+
     with sess.as_default():
 
         sess.run(tf.global_variables_initializer())
@@ -206,15 +223,17 @@ def train_net(dataset_dir, weights_path=None, net_flag='vgg', save_dir="./logs/t
 
         train_cost_time_mean = []
         val_cost_time_mean = []
-        ignore_labels = cv2.imread("./data/simulator/dataset/avm_mask_inverted.png")
+        ignore_label_mask = cv2.imread(ignore_labels_path)
 
         for epoch in range(train_epochs):
             # training part
             t_start = time.time()
 
             with tf.device('/cpu:0'):
-                gt_imgs, binary_gt_labels, instance_gt_labels = train_dataset.next_batch(CFG.TRAIN.BATCH_SIZE,
-                                                                                         ignore_label=ignore_labels)
+                gt_imgs, binary_gt_labels, instance_gt_labels = train_dataset.next_batch(
+                    CFG.TRAIN.BATCH_SIZE,
+                    ignore_label_mask=ignore_label_mask,
+                    ignore_label=255)
                 # gt_imgs = [cv2.resize(tmp,
                 #                       dsize=(CFG.TRAIN.IMG_WIDTH, CFG.TRAIN.IMG_HEIGHT),
                 #                       dst=tmp,
@@ -255,10 +274,10 @@ def train_net(dataset_dir, weights_path=None, net_flag='vgg', save_dir="./logs/t
                                     phase: phase_train})
 
             # if epoch % 10 == 0:
-                # tf.logging.info("Epoch {}."
-                #     "Total loss: {}. Train acc: {}."
-                #     " Binary loss: {}. Instance loss: {}".format(epoch, c, train_accuracy,
-                #                                                  binary_loss, instance_loss))
+            # tf.logging.info("Epoch {}."
+            #     "Total loss: {}. Train acc: {}."
+            #     " Binary loss: {}. Instance loss: {}".format(epoch, c, train_accuracy,
+            #                                                  binary_loss, instance_loss))
 
             if math.isnan(c) or math.isnan(binary_loss) or math.isnan(instance_loss):
                 tf.logging.error('cost is: {:.5f}'.format(c))
@@ -278,7 +297,7 @@ def train_net(dataset_dir, weights_path=None, net_flag='vgg', save_dir="./logs/t
                 for i in range(4):
                     embedding[0][:, :, i] = minmax_scale(embedding[0][:, :, i])
                 embedding_image = np.array(embedding[0], np.uint8)
-                cv2.imwrite('embedding.png', embedding_image[:,:,:-1])
+                cv2.imwrite('embedding.png', embedding_image[:, :, :-1])
 
             cost_time = time.time() - t_start
             train_cost_time_mean.append(cost_time)
@@ -287,7 +306,7 @@ def train_net(dataset_dir, weights_path=None, net_flag='vgg', save_dir="./logs/t
             # validation part
             with tf.device('/cpu:0'):
                 gt_imgs_val, binary_gt_labels_val, instance_gt_labels_val \
-                    = val_dataset.next_batch(CFG.TRAIN.VAL_BATCH_SIZE, ignore_label=ignore_labels)
+                    = val_dataset.next_batch(CFG.TRAIN.VAL_BATCH_SIZE, ignore_label_mask=ignore_label_mask)
                 # gt_imgs_val = [cv2.resize(tmp,
                 #                           dsize=(CFG.TRAIN.IMG_WIDTH, CFG.TRAIN.IMG_HEIGHT),
                 #                           dst=tmp,
@@ -325,18 +344,19 @@ def train_net(dataset_dir, weights_path=None, net_flag='vgg', save_dir="./logs/t
             val_cost_time_mean.append(cost_time_val)
 
             if epoch % CFG.TRAIN.DISPLAY_STEP == 0:
-                tf.logging.info('Step: {:d} total_loss= {:6f} binary_seg_loss= {:6f} instance_seg_loss= {:6f} accuracy= {:6f}'
-                         ' mean_cost_time= {:5f}s '.
-                         format(epoch + 1, c, binary_loss, instance_loss, train_accuracy,
-                                np.mean(train_cost_time_mean)))
+                tf.logging.info(
+                    'Step: {:d} total_loss= {:6f} binary_seg_loss= {:6f} instance_seg_loss= {:6f} accuracy= {:6f}'
+                    ' mean_cost_time= {:5f}s '.
+                        format(epoch + 1, c, binary_loss, instance_loss, train_accuracy,
+                               np.mean(train_cost_time_mean)))
                 train_cost_time_mean.clear()
 
             if epoch % CFG.TRAIN.TEST_DISPLAY_STEP == 0:
                 tf.logging.info('Step_Val: {:d} total_loss= {:6f} binary_seg_loss= {:6f} '
-                         'instance_seg_loss= {:6f} accuracy= {:6f} '
-                         'mean_cost_time= {:5f}s '.
-                         format(epoch + 1, c_val, val_binary_seg_loss, val_instance_seg_loss, val_accuracy,
-                                np.mean(val_cost_time_mean)))
+                                'instance_seg_loss= {:6f} accuracy= {:6f} '
+                                'mean_cost_time= {:5f}s '.
+                                format(epoch + 1, c_val, val_binary_seg_loss, val_instance_seg_loss, val_accuracy,
+                                       np.mean(val_cost_time_mean)))
                 val_cost_time_mean.clear()
 
             if epoch % 2000 == 0:
@@ -351,4 +371,6 @@ if __name__ == '__main__':
     args = init_args()
 
     # train lanenet
-    train_net(args.dataset_dir, args.weights_path, net_flag=args.net, save_dir=args.model_save_dir)
+    train_net(args.dataset_dir, args.weights_path, net_flag=args.net, save_dir=args.model_save_dir,
+              tboard_save_path=args.tboard_save_dir, ignore_labels_path=args.ignore_labels_path,
+              my_checkpoint=args.my_checkpoint)

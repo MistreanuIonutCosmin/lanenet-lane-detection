@@ -102,6 +102,7 @@ class LaneNet(cnn_basenet.CNNBaseModel):
             decode_logits = inference_ret['logits']
 
             zeros = tf.zeros(tf.shape(binary_label))
+            # binary_label = tf.cast(binary_label, tf.int64)
             zeros = tf.cast(zeros, tf.int64)
             binary_label_f = tf.where(tf.equal(binary_label, ignore_label), zeros, binary_label)
 
@@ -119,8 +120,10 @@ class LaneNet(cnn_basenet.CNNBaseModel):
 
             # unique_inverse_val, _ = tf.unique(inverse_weights)
             # ignore_label = tf.cast(ignore_label, tf.float32)
+            # inverse_weights = tf.Print(inverse_weights, [inverse_weights, tf.shape(binary_label[0]), unique_labels, counts],
+            #                            message="inverse_weights values: ")
 
-            inverse_weights = tf.gather(inverse_weights, binary_label)
+            inverse_weights = tf.gather(inverse_weights, binary_label_f)
             zeros = tf.zeros(tf.shape(inverse_weights))
             inverse_weights = tf.where(binary_label == ignore_label, zeros, inverse_weights)
 
