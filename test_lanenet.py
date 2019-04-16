@@ -40,11 +40,11 @@ def init_args():
     parser.add_argument('--image_path', type=str, help='The image path or the src image save dir',
                         default='/media/remus/datasets/AVMSnapshots/AVM/val_images')
     parser.add_argument('--weights_path', type=str, help='The model weights path',
-                        default='/home/remusm/projects/laneNet/model/mobilenet_vlad/mobilenet_lanenet_2019-04-09-22-47-33.ckpt-84000')
+                        default='/home/remusm/projects/laneNet/model/mobilenet_224_4k/mobilenet_lanenet_2019-04-16-14-33-16.ckpt-6000')
     parser.add_argument('--is_batch', type=str, help='If test a batch of images', default='true')
-    parser.add_argument('--batch_size', type=int, help='The batch size of the test images', default=8)
+    parser.add_argument('--batch_size', type=int, help='The batch size of the test images', default=1)
     parser.add_argument('--save_dir', type=str, help='Test result image save dir',
-                        default='/media/remus/datasets/AVMSnapshots/AVM/mobilenet_output_test')
+                        default='/home/remusm/projects/laneNet/')
     parser.add_argument('--use_gpu', type=int, help='If use gpu set 1 or 0 instead', default=1)
 
     return parser.parse_args()
@@ -87,6 +87,7 @@ def test_lanenet(image_path, weights_path, use_gpu, save_dir):
 
     net = lanenet_merge_model.LaneNet(phase=phase_tensor, net_flag='mobilenet')
     binary_seg_ret, instance_seg_ret = net.inference(input_tensor=input_tensor, name='lanenet_model')
+    binary_seg_ret_32 = tf.cast(binary_seg_ret, tf.int32, name="binary_seg")
 
     cluster = lanenet_cluster.LaneNetCluster()
     postprocessor = lanenet_postprocess.LaneNetPoseProcessor()
@@ -99,12 +100,14 @@ def test_lanenet(image_path, weights_path, use_gpu, save_dir):
     #
     #     saver = tf.train.Saver(available_var_map)
     saver = tf.train.Saver()
+    iter_saver = tf.train.Saver()
+    # os.environ['CUDA_VISIBLE_DEVICES'] = ''
 
     # Set sess configuration
     if use_gpu:
-        sess_config = tf.ConfigProto(device_count={'GPU': 0})
+        sess_config = tf.ConfigProto(device_count={'GPU': 1})
     else:
-        sess_config = tf.ConfigProto(device_count={'CPU': 0})
+        sess_config = tf.ConfigProto(device_count={'CPU': 1})
     sess_config.gpu_options.per_process_gpu_memory_fraction = CFG.TEST.GPU_MEMORY_FRACTION
     sess_config.gpu_options.allow_growth = CFG.TRAIN.TF_ALLOW_GROWTH
     sess_config.gpu_options.allocator_type = 'BFC'
@@ -116,8 +119,9 @@ def test_lanenet(image_path, weights_path, use_gpu, save_dir):
         saver.restore(sess=sess, save_path=weights_path)
 
         t_start = time.time()
-        binary_seg_image, instance_seg_image = sess.run([binary_seg_ret, instance_seg_ret],
+        binary_seg_image, instance_seg_image = sess.run([binary_seg_ret_32, instance_seg_ret],
                                                         feed_dict={input_tensor: [image]})
+
         t_cost = time.time() - t_start
         log.info('单张图像车道线预测耗时: {:.5f}s'.format(t_cost))
 
@@ -144,12 +148,16 @@ def test_lanenet(image_path, weights_path, use_gpu, save_dir):
         image_save_path = ops.join(save_dir, image_name)
         cv2.imwrite(image_save_path, mask_image)
 
+        iter_saver.save(sess=sess, save_path=save_dir + "/inference_models/model20.ckpt")
+        tf.train.write_graph(sess.graph.as_graph_def(), save_dir + "/inference_models/", "graph20.pb")
+        # tf.train.write_graph(graph_or_graph_def=sess.graph, logdir='', name='{:s}/lanenet_model.pb'.format(save_dir))
+
     sess.close()
 
     return
 
 
-def test_lanenet_batch(image_dir, weights_path, batch_size, use_gpu, save_dir=None):
+def test_lanenet_batch(image_dir, weights_path, batch_size, use_gpu, save_dir=None, encoder="vgg"):
     """
 
     :param image_dir:
@@ -169,7 +177,7 @@ def test_lanenet_batch(image_dir, weights_path, batch_size, use_gpu, save_dir=No
     input_tensor = tf.placeholder(dtype=tf.float32, shape=[None, 256, 512, 3], name='input_tensor')
     phase_tensor = tf.constant('test', tf.string)
 
-    net = lanenet_merge_model.LaneNet(phase=phase_tensor, net_flag='mobilenet')
+    net = lanenet_merge_model.LaneNet(phase=phase_tensor, net_flag=encoder)
     binary_seg_ret, instance_seg_ret = net.inference(input_tensor=input_tensor, name='lanenet_model')
 
     cluster = lanenet_cluster.LaneNetCluster()
@@ -186,9 +194,9 @@ def test_lanenet_batch(image_dir, weights_path, batch_size, use_gpu, save_dir=No
 
     # Set sess configuration
     if use_gpu:
-        sess_config = tf.ConfigProto(device_count={'GPU': 0})
+        sess_config = tf.ConfigProto(device_count={'GPU': 1})
     else:
-        sess_config = tf.ConfigProto(device_count={'CPU': 0})
+        sess_config = tf.ConfigProto(device_count={'CPU': 1})
     sess_config.gpu_options.per_process_gpu_memory_fraction = CFG.TEST.GPU_MEMORY_FRACTION
     sess_config.gpu_options.allow_growth = CFG.TRAIN.TF_ALLOW_GROWTH
     sess_config.gpu_options.allocator_type = 'BFC'
@@ -213,9 +221,11 @@ def test_lanenet_batch(image_dir, weights_path, batch_size, use_gpu, save_dir=No
             image_list_epoch = [cv2.resize(tmp, (512, 256), interpolation=cv2.INTER_LINEAR)
                                 for tmp in image_list_epoch]
             image_list_epoch = [tmp / 128.0 - 1.0 for tmp in image_list_epoch]
+            # image_list_epoch = [tmp - VGG_MEAN for tmp in image_list_epoch]
             t_cost = time.time() - t_start
-            log.info('[Epoch:{:d}] preprocesses {:d} images, total time: {:.5f}s, average time per sheet: {:.5f}'.format(
-                epoch, len(image_path_epoch), t_cost, t_cost / len(image_path_epoch)))
+            log.info(
+                '[Epoch:{:d}] preprocesses {:d} images, total time: {:.5f}s, average time per sheet: {:.5f}'.format(
+                    epoch, len(image_path_epoch), t_cost, t_cost / len(image_path_epoch)))
 
             t_start = time.time()
             binary_seg_images, instance_seg_images = sess.run(
@@ -286,12 +296,10 @@ if __name__ == '__main__':
         os.makedirs(mask_save_path)
         os.makedirs(embedding_save_path)
 
-
-
     if args.is_batch.lower() == 'false':
         # test hnet model on single image
-        test_lanenet(args.image_path, args.weights_path, args.use_gpu)
+        test_lanenet(args.image_path, args.weights_path, args.use_gpu, save_dir=args.save_dir)
     else:
         # test hnet model on a batch of image
         test_lanenet_batch(image_dir=args.image_path, weights_path=args.weights_path,
-                           save_dir=args.save_dir, use_gpu=args.use_gpu, batch_size=args.batch_size)
+                           save_dir=args.save_dir, use_gpu=args.use_gpu, batch_size=args.batch_size, encoder='mobilenet')

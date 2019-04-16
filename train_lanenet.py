@@ -26,6 +26,7 @@ CFG = global_config.cfg
 VGG_MEAN = [103.939, 116.779, 123.68]
 
 tf.logging.set_verbosity(tf.logging.INFO)
+os.environ['CUDA_VISIBLE_DEVICES'] = ''
 
 
 def init_args():
@@ -40,8 +41,8 @@ def init_args():
     parser.add_argument('--weights_path', type=str, help='The pretrained weights path')
     parser.add_argument('--my_checkpoint', type=str,
                         help='If the checkpoints is saved by me or not (different variable names)', default="true")
-    parser.add_argument('--model_save_dir', type=str, help='model save dir', default='./model/mobilenetV2')
-    parser.add_argument('--tboard_save_dir', type=str, help='model save dir', default='./tboard/mobilenetV2')
+    parser.add_argument('--model_save_dir', type=str, help='model save dir', default='./model/mobilenet_224_10k')
+    parser.add_argument('--tboard_save_dir', type=str, help='model save dir', default='./tboard/mobilenet_224_10k')
     parser.add_argument('--ignore_labels_path', type=str, help='path to ignore labels mask',
                         default='./ignore_labels.png')
 
@@ -189,7 +190,8 @@ def train_net(dataset_dir, weights_path=None, net_flag='vgg', save_dir="./logs/t
     tf.logging.info('Global configuration is as follows:')
     tf.logging.info(CFG)
 
-    saver = tf.train.Saver(max_to_keep=40)
+    iter_saver = tf.train.Saver(max_to_keep=10)
+    best_saver = tf.train.Saver(max_to_keep=3)
 
     with sess.as_default():
 
@@ -224,6 +226,7 @@ def train_net(dataset_dir, weights_path=None, net_flag='vgg', save_dir="./logs/t
         train_cost_time_mean = []
         val_cost_time_mean = []
         ignore_label_mask = cv2.imread(ignore_labels_path)
+        last_c = 100000
 
         for epoch in range(train_epochs):
             # training part
@@ -359,8 +362,17 @@ def train_net(dataset_dir, weights_path=None, net_flag='vgg', save_dir="./logs/t
                                        np.mean(val_cost_time_mean)))
                 val_cost_time_mean.clear()
 
-            if epoch % 2000 == 0:
-                saver.save(sess=sess, save_path=model_save_path, global_step=epoch)
+            if epoch % 1000 == 0:
+                iter_saver.save(sess=sess, save_path=model_save_path, global_step=epoch)
+
+                if c < last_c:
+                    last_c = c
+                    save_dir_best = save_dir + "/best"
+                    if not ops.exists(save_dir_best):
+                        os.makedirs(save_dir_best)
+                    best_model_save_path = ops.join(save_dir_best, model_name)
+
+                    best_saver.save(sess=sess, save_path=best_model_save_path, global_step=epoch)
     sess.close()
 
     return

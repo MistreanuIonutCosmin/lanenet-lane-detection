@@ -80,6 +80,7 @@ class DataSet(object):
     def next_batch(self, batch_size, ignore_label_mask, ignore_label=255):
         """
 
+        :param ignore_label:
         :param batch_size:
         :param ignore_label_mask:
         :return:
@@ -104,7 +105,7 @@ class DataSet(object):
             gt_label_binary_list = self._gt_label_binary_list[idx_start:idx_end]
             gt_label_instance_list = self._gt_label_instance_list[idx_start:idx_end]
 
-            # print(list(map(lambda x: x.split("/")[7].split("_")[0], gt_img_list)))
+            print(list(map(lambda x: x.split("/")[7].split("_")[0], gt_img_list)))
 
             gt_imgs = []
             gt_labels_binary = []
