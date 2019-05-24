@@ -76,8 +76,18 @@ class FCNDecoder(cnn_basenet.CNNBaseModel):
             score_final = self.conv2d(inputdata=deconv_final, out_channel=2,
                                       kernel_size=1, use_bias=False, name='score_final')
 
+            pix_embedding = self.conv2d(inputdata=deconv_final, out_channel=4, kernel_size=1,
+                                        use_bias=False, name='pix_embedding_conv')
+            pix_embedding = self.relu(inputdata=pix_embedding, name='pix_embedding_relu')
+            tf.stop_gradient(pix_embedding)
+
+            combined_layers = tf.concat([deconv_final, pix_embedding, score_final], axis=-1)
+            score_final = self.conv2d(inputdata=combined_layers, out_channel=2,
+                                      kernel_size=1, use_bias=False, name='score_final_combined')
+
+
             ret['logits'] = score_final
-            ret['deconv'] = deconv_final
+            ret['deconv'] = pix_embedding
 
         return ret
 
