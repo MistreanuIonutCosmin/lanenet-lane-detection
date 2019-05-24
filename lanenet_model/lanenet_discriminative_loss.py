@@ -47,6 +47,7 @@ def discriminative_loss_single(
     counts = tf.cast(counts, tf.float32)
     num_instances = tf.size(unique_labels)
 
+    # num_instances = tf.Print(num_instances, [unique_labels, tf.shape(unique_id), counts], message="num_instances")
     # 计算pixel embedding均值向量
     segmented_sum = tf.unsorted_segment_sum(
         reshaped_pred, unique_id, num_instances)
@@ -54,7 +55,7 @@ def discriminative_loss_single(
     mu_expand = tf.gather(mu, unique_id)
 
     # 计算公式的loss(var)
-    distance = tf.norm(tf.subtract(mu_expand, reshaped_pred), axis=1)
+    distance = tf.norm(tf.subtract(mu_expand, reshaped_pred), axis=1, ord=1)
     distance = tf.subtract(distance, delta_v)
     distance = tf.clip_by_value(distance, 0., distance)
     distance = tf.square(distance)
@@ -62,9 +63,10 @@ def discriminative_loss_single(
     l_var = tf.unsorted_segment_sum(distance, unique_id, num_instances)
     l_var = tf.div(l_var, counts)
     l_var = tf.reduce_sum(l_var)
-    l_var = tf.divide(l_var, tf.cast(num_instances, tf.float32))
+    l_var = tf.div(l_var, tf.cast(num_instances, tf.float32))
 
     # 计算公式的loss(dist)
+    # Calculation formula loss(dist)
     mu_interleaved_rep = tf.tile(mu, [num_instances, 1])
     mu_band_rep = tf.tile(mu, [1, num_instances])
     mu_band_rep = tf.reshape(
@@ -75,13 +77,20 @@ def discriminative_loss_single(
 
     mu_diff = tf.subtract(mu_band_rep, mu_interleaved_rep)
 
+    # mu_diff = tf.Print(mu_diff, [tf.shape(mu_diff), ], message="mu_diff: ")
+
     # 去除掩模上的零点
+    # Remove the zero point on the mask
     intermediate_tensor = tf.reduce_sum(tf.abs(mu_diff), axis=1)
+    # intermediate_tensor = tf.Print(intermediate_tensor, [tf.shape(intermediate_tensor), intermediate_tensor ], message="intermediate_tensor: ")
+
     zero_vector = tf.zeros(1, dtype=tf.float32)
     bool_mask = tf.not_equal(intermediate_tensor, zero_vector)
+    # bool_mask = tf.Print(bool_mask, [tf.shape(bool_mask), bool_mask ], message="bool_mask: ")
+
     mu_diff_bool = tf.boolean_mask(mu_diff, bool_mask)
 
-    mu_norm = tf.norm(mu_diff_bool, axis=1)
+    mu_norm = tf.norm(mu_diff_bool, axis=1, ord=1)
     mu_norm = tf.subtract(2. * delta_d, mu_norm)
     mu_norm = tf.clip_by_value(mu_norm, 0., mu_norm)
     mu_norm = tf.square(mu_norm)
@@ -89,15 +98,18 @@ def discriminative_loss_single(
     l_dist = tf.reduce_mean(mu_norm)
 
     # 计算原始Discriminative Loss论文中提到的正则项损失
-    l_reg = tf.reduce_mean(tf.norm(mu, axis=1))
+    l_reg = tf.reduce_mean(tf.norm(mu, axis=1, ord=1))
 
     # 合并损失按照原始Discriminative Loss论文中提到的参数合并
     param_scale = 1.
+    # l_dist = tf.Print(l_dist, [l_var, l_dist, l_reg ], message="l_var, l_dist, l_reg: ")
+
     l_var = param_var * l_var
     l_dist = param_dist * l_dist
     l_reg = param_reg * l_reg
 
     loss = param_scale * (l_var + l_dist + l_reg)
+    l_dist = tf.Print(l_dist, [loss, l_var, l_dist, l_reg ], message="loss, l_var, l_dist, l_reg: ")
 
     return loss, l_var, l_dist, l_reg
 
@@ -114,7 +126,8 @@ def discriminative_loss(prediction, correct_label, feature_dim, image_shape,
 
     def body(label, batch, out_loss, out_var, out_dist, out_reg, i):
         disc_loss, l_var, l_dist, l_reg = discriminative_loss_single(
-            prediction[i], correct_label[i], feature_dim, image_shape, delta_v, delta_d, param_var, param_dist, param_reg)
+            prediction[i], correct_label[i], feature_dim, image_shape, delta_v, delta_d, param_var, param_dist,
+            param_reg)
 
         out_loss = out_loss.write(i, disc_loss)
         out_var = out_var.write(i, l_var)
@@ -138,8 +151,9 @@ def discriminative_loss(prediction, correct_label, feature_dim, image_shape,
                                    dynamic_size=True)
 
     _, _, out_loss_op, out_var_op, out_dist_op, out_reg_op, _ = tf.while_loop(
-        cond, body, [
-            correct_label, prediction, output_ta_loss, output_ta_var, output_ta_dist, output_ta_reg, 0])
+        cond, body, [correct_label, prediction, output_ta_loss, output_ta_var, output_ta_dist, output_ta_reg, 0],
+        parallel_iterations=1)
+
     out_loss_op = out_loss_op.stack()
     out_var_op = out_var_op.stack()
     out_dist_op = out_dist_op.stack()

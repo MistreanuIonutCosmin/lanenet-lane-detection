@@ -25,7 +25,8 @@ def init_args():
     :return:
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument('--src_dir', type=str, help='The origin path of unzipped tusimple dataset')
+    parser.add_argument('--src_dir', type=str, help='The origin path of unzipped tusimple dataset',
+                        default="/media/remus/datasets/tusimple")
 
     return parser.parse_args()
 
@@ -97,9 +98,10 @@ def process_json_file(json_file_path, src_dir, ori_dst_dir, binary_dst_dir, inst
             print('Process {:s} success'.format(image_name))
 
 
-def gen_train_sample(src_dir, b_gt_image_dir, i_gt_image_dir, image_dir):
+def gen_train_sample(src_dir, b_gt_image_dir, i_gt_image_dir, image_dir, phase):
     """
     生成图像训练列表
+    :param phase:
     :param src_dir:
     :param b_gt_image_dir: 二值基准图
     :param i_gt_image_dir: 实例分割基准图
@@ -107,7 +109,7 @@ def gen_train_sample(src_dir, b_gt_image_dir, i_gt_image_dir, image_dir):
     :return:
     """
 
-    with open('{:s}/training/train.txt'.format(src_dir), 'w') as file:
+    with open('{:s}/{:s}.txt'.format(src_dir, phase), 'w') as file:
 
         for image_name in os.listdir(b_gt_image_dir):
             if not image_name.endswith('.png'):
@@ -165,8 +167,19 @@ def process_tusimple_dataset(src_dir):
 
     for json_label_path in glob.glob('{:s}/*.json'.format(traing_folder_path)):
         process_json_file(json_label_path, src_dir, gt_image_dir, gt_binary_dir, gt_instance_dir)
+    gen_train_sample(src_dir, gt_binary_dir, gt_instance_dir, gt_image_dir, "training/train")
 
-    gen_train_sample(src_dir, gt_binary_dir, gt_instance_dir, gt_image_dir)
+    gt_image_dir = ops.join(testing_folder_path, 'gt_image')
+    gt_binary_dir = ops.join(testing_folder_path, 'gt_binary_image')
+    gt_instance_dir = ops.join(testing_folder_path, 'gt_instance_image')
+
+    os.makedirs(gt_image_dir, exist_ok=True)
+    os.makedirs(gt_binary_dir, exist_ok=True)
+    os.makedirs(gt_instance_dir, exist_ok=True)
+
+    for json_label_path in glob.glob('{:s}/*.json'.format(testing_folder_path)):
+        process_json_file(json_label_path, src_dir, gt_image_dir, gt_binary_dir, gt_instance_dir)
+    gen_train_sample(src_dir, gt_binary_dir, gt_instance_dir, gt_image_dir, "testing/val")
 
     return
 

@@ -97,7 +97,7 @@ class DataSet(object):
             raise ValueError('Batch size is greater than the total number of samples')
 
         if idx_end > len(self._gt_label_binary_list):
-            self._random_dataset()
+            # self._random_dataset()
             self._next_batch_loop_count = 0
             return self.next_batch(batch_size, ignore_label_mask)
         else:
@@ -105,7 +105,6 @@ class DataSet(object):
             gt_label_binary_list = self._gt_label_binary_list[idx_start:idx_end]
             gt_label_instance_list = self._gt_label_instance_list[idx_start:idx_end]
 
-            print(list(map(lambda x: x.split("/")[7].split("_")[0], gt_img_list)))
 
             gt_imgs = []
             gt_labels_binary = []
@@ -114,7 +113,7 @@ class DataSet(object):
             for gt_img_path in gt_img_list:
                 gt_img = cv2.imread(gt_img_path, cv2.IMREAD_COLOR)
                 # @vlad.paunescu reverse BGR2RGB
-                gt_img = gt_img[:, :, ::-1]
+                # gt_img = gt_img[:, :, ::-1]
                 gt_imgs.append(gt_img)
 
             for gt_label_path in gt_label_binary_list:
@@ -132,6 +131,8 @@ class DataSet(object):
             for gt_label_path in gt_label_instance_list:
                 label_img = cv2.imread(gt_label_path, cv2.IMREAD_UNCHANGED)
                 gt_labels_instance.append(label_img)
+
+            # print("img", list(map(lambda x: x.split("/")[7].split("_")[0], gt_img_list)), np.shape(gt_imgs))
 
             self._next_batch_loop_count += 1
             return gt_imgs, gt_labels_binary, gt_labels_instance

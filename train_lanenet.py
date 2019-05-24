@@ -17,6 +17,7 @@ import time
 import cv2
 import numpy as np
 import tensorflow as tf
+from tensorflow.python import debug as tf_debug
 
 from config import global_config
 from data_provider import lanenet_data_processor
@@ -26,7 +27,9 @@ CFG = global_config.cfg
 VGG_MEAN = [103.939, 116.779, 123.68]
 
 tf.logging.set_verbosity(tf.logging.INFO)
-os.environ['CUDA_VISIBLE_DEVICES'] = ''
+
+
+# os.environ['CUDA_VISIBLE_DEVICES'] = ''
 
 
 def init_args():
@@ -41,10 +44,10 @@ def init_args():
     parser.add_argument('--weights_path', type=str, help='The pretrained weights path')
     parser.add_argument('--my_checkpoint', type=str,
                         help='If the checkpoints is saved by me or not (different variable names)', default="true")
-    parser.add_argument('--model_save_dir', type=str, help='model save dir', default='./model/mobilenet_224_10k')
-    parser.add_argument('--tboard_save_dir', type=str, help='model save dir', default='./tboard/mobilenet_224_10k')
+    parser.add_argument('--model_save_dir', type=str, help='model dir', default='./model/mobilenet_preTuS_clean')
+    parser.add_argument('--tboard_save_dir', type=str, help='tboard dir', default='./tboard/mobilenet_preTuS_clean')
     parser.add_argument('--ignore_labels_path', type=str, help='path to ignore labels mask',
-                        default='./ignore_labels.png')
+                        default='./ignore_labels_AVM.png')
 
     return parser.parse_args()
 
@@ -86,7 +89,7 @@ def train_net(dataset_dir, weights_path=None, net_flag='vgg', save_dir="./logs/t
     train_dataset = lanenet_data_processor.DataSet(train_dataset_file)
     val_dataset = lanenet_data_processor.DataSet(val_dataset_file)
 
-    with tf.device('/gpu:0'):
+    with tf.device('/gpu:1'):
         input_tensor = tf.placeholder(dtype=tf.float32,
                                       shape=[CFG.TRAIN.BATCH_SIZE, CFG.TRAIN.IMG_HEIGHT,
                                              CFG.TRAIN.IMG_WIDTH, 3],
@@ -125,13 +128,14 @@ def train_net(dataset_dir, weights_path=None, net_flag='vgg', save_dir="./logs/t
 
         global_step = tf.Variable(0, trainable=False)
         learning_rate = tf.train.exponential_decay(CFG.TRAIN.LEARNING_RATE, global_step,
-                                                   100000, 0.1, staircase=True)
+                                                   CFG.TRAIN.LR_DECAY_STEPS, CFG.TRAIN.LR_DECAY_RATE, staircase=True)
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         with tf.control_dependencies(update_ops):
             optimizer = tf.train.MomentumOptimizer(
                 learning_rate=learning_rate, momentum=0.9).minimize(loss=total_loss,
                                                                     var_list=tf.trainable_variables(),
                                                                     global_step=global_step)
+            # update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
 
     # Set tf saver
 
@@ -141,11 +145,13 @@ def train_net(dataset_dir, weights_path=None, net_flag='vgg', save_dir="./logs/t
     else:
         from correct_path_saver import restore_from_classification_checkpoint_fn, get_variables_available_in_checkpoint
         if weights_path is not None:
-            var_map = restore_from_classification_checkpoint_fn("lanenet_model/inference")
+            # var_map = restore_from_classification_checkpoint_fn("lanenet_model/inference")
             available_var_map = (get_variables_available_in_checkpoint(
-                var_map, weights_path, include_global_step=False))
+                tf.global_variables(), weights_path, include_global_step=False))
 
             init_saver = tf.train.Saver(available_var_map)
+        else:
+            init_saver = tf.train.Saver()
 
     if not ops.exists(save_dir):
         os.makedirs(save_dir)
@@ -180,6 +186,9 @@ def train_net(dataset_dir, weights_path=None, net_flag='vgg', save_dir="./logs/t
     # sess_config.device_count = {'GPU': 0}
 
     sess = tf.Session(config=sess_config)
+    # sess = tf_debug.TensorBoardDebugWrapperSession(sess=sess,
+    #                                                grpc_debug_server_addresses="remusm-pc:7000",
+    #                                                send_traceback_and_source_code=False)
 
     summary_writer = tf.summary.FileWriter(tboard_save_path)
     summary_writer.add_graph(sess.graph)
@@ -207,6 +216,9 @@ def train_net(dataset_dir, weights_path=None, net_flag='vgg', save_dir="./logs/t
         else:
             tf.logging.info('Restore model from last model checkpoint {:s}'.format(weights_path))
             init_saver.restore(sess=sess, save_path=weights_path)
+
+            assign_op = global_step.assign(0)
+            sess.run(assign_op)
 
         # 加载预训练参数
         if net_flag == 'vgg' and weights_path is None:
@@ -237,45 +249,28 @@ def train_net(dataset_dir, weights_path=None, net_flag='vgg', save_dir="./logs/t
                     CFG.TRAIN.BATCH_SIZE,
                     ignore_label_mask=ignore_label_mask,
                     ignore_label=255)
-                # gt_imgs = [cv2.resize(tmp,
-                #                       dsize=(CFG.TRAIN.IMG_WIDTH, CFG.TRAIN.IMG_HEIGHT),
-                #                       dst=tmp,
-                #                       interpolation=cv2.INTER_LINEAR)
-                #            for tmp in gt_imgs]
 
                 # gt_imgs = [tmp - VGG_MEAN for tmp in gt_imgs]
                 gt_imgs = [tmp / 128.0 - 1.0 for tmp in gt_imgs]
 
-                # images = tf.expand_dims(image, 0)
-                # images = tf.cast(images, tf.float32) / 128. - 1
-                # images.set_shape((None, None, None, 3))
 
-                # binary_gt_labels = [cv2.resize(tmp,
-                #                                dsize=(CFG.TRAIN.IMG_WIDTH, CFG.TRAIN.IMG_HEIGHT),
-                #                                dst=tmp,
-                #                                interpolation=cv2.INTER_NEAREST)
-                #                     for tmp in binary_gt_labels]
                 binary_gt_labels = [np.expand_dims(tmp, axis=-1) for tmp in binary_gt_labels]
-                # instance_gt_labels = [cv2.resize(tmp,
-                #                                  dsize=(CFG.TRAIN.IMG_WIDTH, CFG.TRAIN.IMG_HEIGHT),
-                #                                  dst=tmp,
-                #                                  interpolation=cv2.INTER_NEAREST)
-                #                       for tmp in instance_gt_labels]
+
             phase_train = 'train'
 
-            _, c, train_accuracy, train_summary, binary_loss, instance_loss, embedding, binary_seg_img = \
+            _, c, train_accuracy, train_summary, binary_loss, instance_loss, embedding, binary_seg_img, g_step = \
                 sess.run([optimizer, total_loss,
                           accuracy,
                           train_merge_summary_op,
                           binary_seg_loss,
                           disc_loss,
                           pix_embedding,
-                          out_logits_out],
+                          out_logits_out,
+                          global_step],
                          feed_dict={input_tensor: gt_imgs,
                                     binary_label_tensor: binary_gt_labels,
                                     instance_label_tensor: instance_gt_labels,
                                     phase: phase_train})
-
             # if epoch % 10 == 0:
             # tf.logging.info("Epoch {}."
             #     "Total loss: {}. Train acc: {}."
@@ -286,12 +281,14 @@ def train_net(dataset_dir, weights_path=None, net_flag='vgg', save_dir="./logs/t
                 tf.logging.error('cost is: {:.5f}'.format(c))
                 tf.logging.error('binary cost is: {:.5f}'.format(binary_loss))
                 tf.logging.error('instance cost is: {:.5f}'.format(instance_loss))
-                cv2.imwrite('nan_image.png', gt_imgs[0] + VGG_MEAN)
+                # cv2.imwrite('nan_image.png', gt_imgs[0] + VGG_MEAN)
+                cv2.imwrite('nan_image.png', (gt_imgs[0] + 1.0) * 128)
                 cv2.imwrite('nan_instance_label.png', instance_gt_labels[0])
                 cv2.imwrite('nan_binary_label.png', binary_gt_labels[0] * 255)
                 return
 
             if epoch % 100 == 0:
+                # cv2.imwrite('nan_image.png', gt_imgs[0] + VGG_MEAN)
                 cv2.imwrite('image.png', (gt_imgs[0] + 1.0) * 128)
                 cv2.imwrite('binary_label.png', binary_gt_labels[0] * 255)
                 cv2.imwrite('instance_label.png', instance_gt_labels[0])
@@ -310,23 +307,11 @@ def train_net(dataset_dir, weights_path=None, net_flag='vgg', save_dir="./logs/t
             with tf.device('/cpu:0'):
                 gt_imgs_val, binary_gt_labels_val, instance_gt_labels_val \
                     = val_dataset.next_batch(CFG.TRAIN.VAL_BATCH_SIZE, ignore_label_mask=ignore_label_mask)
-                # gt_imgs_val = [cv2.resize(tmp,
-                #                           dsize=(CFG.TRAIN.IMG_WIDTH, CFG.TRAIN.IMG_HEIGHT),
-                #                           dst=tmp,
-                #                           interpolation=cv2.INTER_LINEAR)
-                #                for tmp in gt_imgs_val]
+
                 # gt_imgs_val = [tmp - VGG_MEAN for tmp in gt_imgs_val]
                 gt_imgs_val = [tmp / 128.0 - 1.0 for tmp in gt_imgs_val]
-                # binary_gt_labels_val = [cv2.resize(tmp,
-                #                                    dsize=(CFG.TRAIN.IMG_WIDTH, CFG.TRAIN.IMG_HEIGHT),
-                #                                    dst=tmp)
-                #                         for tmp in binary_gt_labels_val]
+
                 binary_gt_labels_val = [np.expand_dims(tmp, axis=-1) for tmp in binary_gt_labels_val]
-                # instance_gt_labels_val = [cv2.resize(tmp,
-                #                                      dsize=(CFG.TRAIN.IMG_WIDTH, CFG.TRAIN.IMG_HEIGHT),
-                #                                      dst=tmp,
-                #                                      interpolation=cv2.INTER_NEAREST)
-                #                           for tmp in instance_gt_labels_val]
             phase_val = 'test'
 
             t_start_val = time.time()
@@ -362,7 +347,7 @@ def train_net(dataset_dir, weights_path=None, net_flag='vgg', save_dir="./logs/t
                                        np.mean(val_cost_time_mean)))
                 val_cost_time_mean.clear()
 
-            if epoch % 1000 == 0:
+            if epoch % 2000 == 0:
                 iter_saver.save(sess=sess, save_path=model_save_path, global_step=epoch)
 
                 if c < last_c:
@@ -373,6 +358,7 @@ def train_net(dataset_dir, weights_path=None, net_flag='vgg', save_dir="./logs/t
                     best_model_save_path = ops.join(save_dir_best, model_name)
 
                     best_saver.save(sess=sess, save_path=best_model_save_path, global_step=epoch)
+
     sess.close()
 
     return

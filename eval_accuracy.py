@@ -60,6 +60,7 @@ class LaneEval(object):
 
         return s / max(min(4.0, len(gt)), 1.), fp, \
                fn, tp
+
     @staticmethod
     def bench_one_submit(pred_file, gt_file):
         try:
@@ -118,7 +119,7 @@ if __name__ == '__main__':
     try:
         if len(sys.argv) != 3:
             raise Exception('Invalid input arguments')
-        print LaneEval.bench_one_submit(sys.argv[1], sys.argv[2])
+        print(LaneEval.bench_one_submit(sys.argv[1], sys.argv[2]))
     except Exception as e:
-        print e.message
+        print(e.message)
         sys.exit(e.message)

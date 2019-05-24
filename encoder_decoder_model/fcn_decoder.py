@@ -19,6 +19,7 @@ class FCNDecoder(cnn_basenet.CNNBaseModel):
     """
     实现一个全卷积解码类
     """
+
     def __init__(self, phase):
         """
 
@@ -52,14 +53,21 @@ class FCNDecoder(cnn_basenet.CNNBaseModel):
 
             score = self.conv2d(inputdata=input_tensor, out_channel=64,
                                 kernel_size=1, use_bias=False, name='score_origin')
+            # score = tf.Print(score, [tf.reduce_sum(tf.to_int32(tf.is_nan(input_tensor))) > 0,
+            #                          tf.reduce_sum(tf.to_int32(tf.is_nan(score))) > 0],
+            #                  message='input, score - {:s}: '.format(decode_layer_list[0]))
+
             decode_layer_list = decode_layer_list[1:]
             for i in range(len(decode_layer_list)):
                 deconv = self.deconv2d(inputdata=score, out_channel=64, kernel_size=4,
                                        stride=2, use_bias=False, name='deconv_{:d}'.format(i + 1))
+
                 input_tensor = input_tensor_dict[decode_layer_list[i]]['data']
                 score = self.conv2d(inputdata=input_tensor, out_channel=64,
                                     kernel_size=1, use_bias=False, name='score_{:d}'.format(i + 1))
+
                 fused = tf.add(deconv, score, name='fuse_{:d}'.format(i + 1))
+
                 score = fused
 
             deconv_final = self.deconv2d(inputdata=score, out_channel=64, kernel_size=16,
@@ -75,7 +83,6 @@ class FCNDecoder(cnn_basenet.CNNBaseModel):
 
 
 if __name__ == '__main__':
-
     vgg_encoder = vgg_encoder.VGG16Encoder(phase=tf.constant('train', tf.string))
     dense_encoder = dense_encoder.DenseEncoder(l=40, growthrate=12,
                                                with_bc=True, phase='train', n=5)

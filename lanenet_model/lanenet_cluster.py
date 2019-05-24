@@ -16,6 +16,7 @@ from sklearn.cluster import DBSCAN
 import time
 import warnings
 import cv2
+import sys
 try:
     from cv2 import cv2
 except ImportError:
@@ -164,14 +165,17 @@ class LaneNetCluster(object):
         lane_embedding_feats, lane_coordinate = self._get_lane_area(binary_seg_ret, instance_seg_ret)
 
         # num_clusters, labels, cluster_centers = self._cluster(lane_embedding_feats, bandwidth=1.5)
-        num_clusters, labels, cluster_centers = self._cluster_v2(lane_embedding_feats)
+        try:
+            num_clusters, labels, cluster_centers = self._cluster_v2(lane_embedding_feats)
+        except:
+            print("Fail clustering!")
+            mask_image = np.zeros(shape=[binary_seg_ret.shape[0], binary_seg_ret.shape[1], 3], dtype=np.uint8)
+            return mask_image
 
-        # print("centers shape", cluster_centers)
-
+        np.set_printoptions(threshold=sys.maxsize)
+        # print("centers shape", np.shape(cluster_centers), cluster_centers)
+        #
         # for center in cluster_centers:
-        #     # for i in range(len(lane_embedding_feats)):
-        #     #     if lane_embedding_feats[:, i] == center.all():
-        #     #         print("Centroid: ", i)
         #
         #     z = [i for i in zip(range(len(lane_embedding_feats)), lane_embedding_feats)]
         #     if center in lane_embedding_feats:
@@ -197,6 +201,7 @@ class LaneNetCluster(object):
         for index, i in enumerate(cluster_index):
             idx = np.where(labels == i)
             coord = lane_coordinate[idx]
+            # print(i, cluster_centers[coord])
             # coord = self._thresh_coord(coord)
             coord = np.flip(coord, axis=1)
             # coord = (coord[:, 0], coord[:, 1])

@@ -98,8 +98,20 @@ class LaneNet(cnn_basenet.CNNBaseModel):
         with tf.variable_scope(name):
             # 前向传播获取logits
             inference_ret = self._build_model(input_tensor=input_tensor, name='inference')
+
+            # 计算discriminative loss损失函数
+            decode_deconv = inference_ret['deconv']
+            # 像素嵌入
+            pix_embedding = self.conv2d(inputdata=decode_deconv, out_channel=4, kernel_size=1,
+                                        use_bias=False, name='pix_embedding_conv')
+            pix_embedding = self.relu(inputdata=pix_embedding, name='pix_embedding_relu')
+
             # 计算二值分割损失函数
             decode_logits = inference_ret['logits']
+            # decode_logits = tf.concat([pix_embedding, decode_deconv], axis=-1)
+            # decode_logits = tf.concat([pix_embedding, decode_deconv], axis=-1)
+            # decode_logits = self.conv2d(inputdata=decode_logits, out_channel=2,
+            #                             kernel_size=1, use_bias=False, name='score_final')
 
             zeros = tf.zeros(tf.shape(binary_label))
             # binary_label = tf.cast(binary_label, tf.int64)
@@ -114,40 +126,28 @@ class LaneNet(cnn_basenet.CNNBaseModel):
             # 加入class weights
             unique_labels, unique_id, counts = tf.unique_with_counts(binary_label_plain)
             counts = tf.cast(counts, tf.float32)
-            inverse_weights = tf.divide(1.0,
-                                        tf.log(tf.add(tf.divide(tf.constant(1.0), counts),
-                                                      tf.constant(1.02))))
-
-            # unique_inverse_val, _ = tf.unique(inverse_weights)
-            # ignore_label = tf.cast(ignore_label, tf.float32)
-            # inverse_weights = tf.Print(inverse_weights, [inverse_weights, tf.shape(binary_label[0]), unique_labels, counts],
-            #                            message="inverse_weights values: ")
+            inverse_weights = tf.divide(1.0, tf.log(tf.add(tf.divide(tf.constant(1.0), counts), tf.constant(1.02))))
 
             inverse_weights = tf.gather(inverse_weights, binary_label_f)
             zeros = tf.zeros(tf.shape(inverse_weights))
             inverse_weights = tf.where(binary_label == ignore_label, zeros, inverse_weights)
 
-            # debug code start
-            # unique_labels, unique_id, counts = tf.unique_with_counts(tf.reshape(inverse_weights, shape=[-1]))
-            # inverse_weights = tf.Print(inverse_weights, [tf.shape(inverse_weights), unique_labels, counts],
-            #                            message="inverse_weights values: ")
-            # debug code end
-
             binary_segmenatation_loss = tf.losses.sparse_softmax_cross_entropy(
                 labels=binary_label_f, logits=decode_logits, weights=inverse_weights)
+            # binary_segmenatation_loss = tf.Print(binary_segmenatation_loss, [binary_segmenatation_loss], summarize=10,
+            #                                      message="binary losses: ")
             binary_segmenatation_loss = tf.reduce_mean(binary_segmenatation_loss)
 
-            # 计算discriminative loss损失函数
-            decode_deconv = inference_ret['deconv']
-            # 像素嵌入
-            pix_embedding = self.conv2d(inputdata=decode_deconv, out_channel=4, kernel_size=1,
-                                        use_bias=False, name='pix_embedding_conv')
-            pix_embedding = self.relu(inputdata=pix_embedding, name='pix_embedding_relu')
             # 计算discriminative loss
             image_shape = (pix_embedding.get_shape().as_list()[1], pix_embedding.get_shape().as_list()[2])
             disc_loss, l_var, l_dist, l_reg = \
                 lanenet_discriminative_loss.discriminative_loss(
                     pix_embedding, instance_label, 4, image_shape, 0.5, 3.0, 1.0, 1.0, 0.001)
+
+            # asd = tf.Print(disc_loss, [disc_loss, l_var, l_dist, l_reg],
+            #                      message="disc_loss, l_var, l_dist, l_reg: ")
+            # asd *= 0
+            # tf.losses.add_loss(asd, "")
 
             # 合并损失
             if self._net_flag != "mobilenet":
@@ -163,14 +163,24 @@ class LaneNet(cnn_basenet.CNNBaseModel):
 
             elif self._net_flag == "mobilenet":
                 reg_losses = tf.contrib.slim.losses.get_regularization_losses()
-                reg_loss = tf.add_n(reg_losses, name="reg_loss")
+                reg_loss_encode = tf.add_n(reg_losses, name="reg_loss_encode")
+
+                decode_var_list = []
+                for decode_var in tf.trainable_variables():
+                    if 'decode' in decode_var.name:
+                        decode_var_list.append(tf.nn.l2_loss(decode_var))
+                reg_loss_decode = tf.add_n(decode_var_list)
+
+                reg_loss = tf.add(reg_loss_encode, reg_loss_decode, name="reg_loss")
 
                 tf.losses.add_loss(binary_segmenatation_loss, "binary_segmenatation_loss")
                 tf.losses.add_loss(disc_loss, "disc_loss")
                 tf.losses.add_loss(reg_loss, "reg_loss")
 
-                total_loss = 0.5 * binary_segmenatation_loss + 0.5 * disc_loss + reg_loss * 0.001
+                total_loss = 0.6 * binary_segmenatation_loss + 0.4 * disc_loss + reg_loss * 0.001
                 tf.losses.add_loss(total_loss, "total_loss")
+
+            # tf.Print(total_loss, [tf.shape(total_loss)], message="total_loss: ")
 
             ret = {
                 'total_loss': total_loss,
@@ -193,9 +203,7 @@ class LaneNet(cnn_basenet.CNNBaseModel):
             # 前向传播获取logits
             inference_ret = self._build_model(input_tensor=input_tensor, name='inference')
             # 计算二值分割损失函数
-            decode_logits = inference_ret['logits']
-            binary_seg_ret = tf.nn.softmax(logits=decode_logits)
-            binary_seg_ret = tf.argmax(binary_seg_ret, axis=-1)
+
             # 计算像素嵌入
             decode_deconv = inference_ret['deconv']
             # 像素嵌入
@@ -203,7 +211,16 @@ class LaneNet(cnn_basenet.CNNBaseModel):
                                         use_bias=False, name='pix_embedding_conv')
             pix_embedding = self.relu(inputdata=pix_embedding, name='pix_embedding_relu')
 
-            return binary_seg_ret, pix_embedding
+            decode_logits = inference_ret['logits']
+            #
+            # decode_logits = tf.concat([pix_embedding, decode_deconv], axis=-1)
+            # decode_logits = self.conv2d(inputdata=decode_logits, out_channel=2,
+            #                             kernel_size=1, use_bias=False, name='score_final')
+
+            prob_seg_ret = tf.nn.softmax(logits=decode_logits)
+            binary_seg_ret = tf.argmax(prob_seg_ret, axis=-1)
+
+            return binary_seg_ret, pix_embedding, prob_seg_ret
 
 
 if __name__ == '__main__':
