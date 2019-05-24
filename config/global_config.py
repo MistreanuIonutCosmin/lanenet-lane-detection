@@ -38,7 +38,7 @@ __C.TRAIN.BATCH_SIZE = 8
 # Set the shadownet validation batch size
 __C.TRAIN.VAL_BATCH_SIZE = 8
 # Set the learning rate decay steps
-__C.TRAIN.LR_DECAY_STEPS = 60000
+__C.TRAIN.LR_DECAY_STEPS = 80000
 # Set the learning rate decay rate
 __C.TRAIN.LR_DECAY_RATE = 0.3
 # Set the class numbers

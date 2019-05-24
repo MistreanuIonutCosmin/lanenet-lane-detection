@@ -73,7 +73,10 @@ class FCNDecoder(cnn_basenet.CNNBaseModel):
             deconv_final = self.deconv2d(inputdata=score, out_channel=64, kernel_size=16,
                                          stride=8, use_bias=False, name='deconv_final')
 
-            score_final = self.conv2d(inputdata=deconv_final, out_channel=2,
+            deconv_binary = self.deconv2d(inputdata=score, out_channel=64, kernel_size=16,
+                                         stride=8, use_bias=False, name='deconv_binary')
+
+            score_final = self.conv2d(inputdata=deconv_binary, out_channel=2,
                                       kernel_size=1, use_bias=False, name='score_final')
 
             ret['logits'] = score_final
