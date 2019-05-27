@@ -42,13 +42,13 @@ def init_args():
                         default='/media/remus/datasets/AVMSnapshots/AVM/val_images')
     # default = '/media/remus/datasets/AVMSnapshots/AVM/val_images/0021_AVMFrontCamera.png')
     parser.add_argument('--weights_path', type=str, help='The model weights path',
-                        default='/home/remusm/projects/laneNet/model/mobilenet_preTuS_combined/best/mobilenet_lanenet_2019-05-23-15-38-03.ckpt-144000')
+                        default='/home/remusm/projects/laneNet/model/mobilenet_duplicate_deconv/best/mobilenet_lanenet_2019-05-24-14-50-38.ckpt-110000')
                         # default='/media/remus/projects/lanenet-lane-detection/weights/AVM_ignore_label/tusimple_lanenet_vgg_2019-03-28-15-42-02.ckpt-200000')
     parser.add_argument('--encoder', type=str, help='If use gpu set 1 or 0 instead', default="mobilenet")
     parser.add_argument('--is_batch', type=str, help='If test a batch of images', default='true')
     parser.add_argument('--batch_size', type=int, help='The batch size of the test images', default=4)
     parser.add_argument('--save_dir', type=str, help='Test result image save dir',
-                        default='/media/remus/datasets/AVMSnapshots/AVM/mobilenet_pTuS_combined/')
+                        default='/media/remus/datasets/AVMSnapshots/AVM/mobilenet_pTuS_dup_deconv/')
     parser.add_argument('--use_gpu', type=int, help='If use gpu set 1 or 0 instead', default=1)
 
     return parser.parse_args()
@@ -276,7 +276,7 @@ def test_lanenet_batch(image_dir, weights_path, batch_size, use_gpu, save_dir=No
                     plt.ioff()
 
                 if save_dir is not None:
-                    mask_image = cv2.addWeighted(image_vis_list[index], 1.0, mask_image, 1.0, 0)
+                    # mask_image = cv2.addWeighted(image_vis_list[index], 1.0, mask_image, 1.0, 0)
                     image_name = ops.split(image_path_epoch[index])[1]
                     image_save_path = ops.join(save_dir + "/image", image_name)
                     mask_save_path = ops.join(save_dir + "/mask", image_name)

@@ -109,6 +109,9 @@ class DataSet(object):
             gt_imgs = []
             gt_labels_binary = []
             gt_labels_instance = []
+            # print("img", list(map(lambda x: x.split("/")[7].split("_")[0], gt_img_list)), np.shape(gt_imgs))
+
+
 
             for gt_img_path in gt_img_list:
                 gt_img = cv2.imread(gt_img_path, cv2.IMREAD_COLOR)
@@ -117,22 +120,24 @@ class DataSet(object):
                 gt_imgs.append(gt_img)
 
             for gt_label_path in gt_label_binary_list:
-                label_img = cv2.imread(gt_label_path, cv2.IMREAD_COLOR)
-                label_binary = np.zeros([label_img.shape[0], label_img.shape[1]], dtype=np.uint8)
+                try:
+                    label_img = cv2.imread(gt_label_path, cv2.IMREAD_COLOR)
+                    label_binary = np.zeros([label_img.shape[0], label_img.shape[1]], dtype=np.uint8)
 
-                idx = np.where((label_img[:, :, :] != [0, 0, 0]).all(axis=2))
-                label_binary[idx] = 1
+                    idx = np.where((label_img[:, :, :] != [0, 0, 0]).all(axis=2))
+                    label_binary[idx] = 1
 
-                idx = np.where((ignore_label_mask[:, :, :] == [0, 0, 0]).all(axis=2))
-                label_binary[idx] = ignore_label
+                    idx = np.where((ignore_label_mask[:, :, :] == [0, 0, 0]).all(axis=2))
+                    label_binary[idx] = ignore_label
 
-                gt_labels_binary.append(label_binary)
+                    gt_labels_binary.append(label_binary)
+                except:
+                    print(gt_label_path)
 
             for gt_label_path in gt_label_instance_list:
                 label_img = cv2.imread(gt_label_path, cv2.IMREAD_UNCHANGED)
                 gt_labels_instance.append(label_img)
 
-            # print("img", list(map(lambda x: x.split("/")[7].split("_")[0], gt_img_list)), np.shape(gt_imgs))
 
             self._next_batch_loop_count += 1
             return gt_imgs, gt_labels_binary, gt_labels_instance

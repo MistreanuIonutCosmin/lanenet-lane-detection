@@ -44,8 +44,8 @@ def init_args():
     parser.add_argument('--weights_path', type=str, help='The pretrained weights path')
     parser.add_argument('--my_checkpoint', type=str,
                         help='If the checkpoints is saved by me or not (different variable names)', default="true")
-    parser.add_argument('--model_save_dir', type=str, help='model dir', default='./model/mobilenet_preTuS_clean')
-    parser.add_argument('--tboard_save_dir', type=str, help='tboard dir', default='./tboard/mobilenet_preTuS_clean')
+    parser.add_argument('--model_save_dir', type=str, help='model dir', default='./model/mobilenet_preTuS_merged')
+    parser.add_argument('--tboard_save_dir', type=str, help='tboard dir', default='./tboard/mobilenet_preTuS_merged')
     parser.add_argument('--ignore_labels_path', type=str, help='path to ignore labels mask',
                         default='./ignore_labels_AVM.png')
 
