@@ -75,7 +75,7 @@ class FCNDecoder(cnn_basenet.CNNBaseModel):
 
             score_final = self.conv2d(inputdata=deconv_final, out_channel=2,
                                       kernel_size=1, use_bias=False, name='score_final')
-
+            ret['prev_logits'] = score_final
             pix_embedding = self.conv2d(inputdata=deconv_final, out_channel=4, kernel_size=1,
                                         use_bias=False, name='pix_embedding_conv')
             pix_embedding = self.relu(inputdata=pix_embedding, name='pix_embedding_relu')

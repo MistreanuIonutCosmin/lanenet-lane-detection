@@ -29,6 +29,8 @@ from correct_path_saver import restore_from_classification_checkpoint_fn, get_va
 
 CFG = global_config.cfg
 VGG_MEAN = [103.939, 116.779, 123.68]
+
+
 # os.environ["CUDA_VISIBLE_DEVICES"]=''
 
 
@@ -39,17 +41,19 @@ def init_args():
     """
     parser = argparse.ArgumentParser()
     parser.add_argument('--image_path', type=str, help='The image path or the src image save dir',
-                        default='/media/remus/datasets/AVMSnapshots/AVM/val_images')
+                        default='/media/remus/3D_GT_extractor/190422_3D_gt_extractor/01_simulator/source_code/simulator/AVMSnapshots/test/')
     # default = '/media/remus/datasets/AVMSnapshots/AVM/val_images/0021_AVMFrontCamera.png')
     parser.add_argument('--weights_path', type=str, help='The model weights path',
-                        default='/home/remusm/projects/laneNet/model/mobilenet_duplicate_deconv/best/mobilenet_lanenet_2019-05-24-14-50-38.ckpt-110000')
-                        # default='/media/remus/projects/lanenet-lane-detection/weights/AVM_ignore_label/tusimple_lanenet_vgg_2019-03-28-15-42-02.ckpt-200000')
+                        default='/home/remusm/projects/laneNet/model/preTuS_mergedB_dupLoss_flip/mobilenet_lanenet_2019-05-28-17-18-07.ckpt-144000')
+    # default='/media/remus/projects/lanenet-lane-detection/weights/AVM_ignore_label/tusimple_lanenet_vgg_2019-03-28-15-42-02.ckpt-200000')
     parser.add_argument('--encoder', type=str, help='If use gpu set 1 or 0 instead', default="mobilenet")
     parser.add_argument('--is_batch', type=str, help='If test a batch of images', default='true')
-    parser.add_argument('--batch_size', type=int, help='The batch size of the test images', default=4)
+    parser.add_argument('--batch_size', type=int, help='The batch size of the test images', default=32)
     parser.add_argument('--save_dir', type=str, help='Test result image save dir',
-                        default='/media/remus/datasets/AVMSnapshots/AVM/mobilenet_pTuS_dup_deconv/')
+                        default='/media/remus/3D_GT_extractor/190422_3D_gt_extractor/01_simulator/source_code/simulator/AVMSnapshots/out_test/')
     parser.add_argument('--use_gpu', type=int, help='If use gpu set 1 or 0 instead', default=1)
+    parser.add_argument('--ignore_labels_path', type=str, help='path to ignore labels mask',
+                        default='./ignore_labels (copy).png')
 
     return parser.parse_args()
 
@@ -83,11 +87,12 @@ def test_lanenet(image_path, weights_path, use_gpu, save_dir):
     t_start = time.time()
     image = cv2.imread(image_path, cv2.IMREAD_COLOR)
     image_vis = image
-    image = cv2.resize(image, (512, 256), interpolation=cv2.INTER_LINEAR)
+    image = cv2.resize(image, (CFG.TRAIN.IMG_WIDTH, CFG.TRAIN.IMG_HEIGHT), interpolation=cv2.INTER_LINEAR)
     image = image / 128.0 - 1.0
     log.info('图像读取完毕, 耗时: {:.5f}s'.format(time.time() - t_start))
 
-    input_tensor = tf.placeholder(dtype=tf.float32, shape=[1, 256, 512, 3], name='input_tensor')
+    input_tensor = tf.placeholder(dtype=tf.float32, shape=[1, CFG.TRAIN.IMG_HEIGHT, CFG.TRAIN.IMG_WIDTH, 3],
+                                  name='input_tensor')
     phase_tensor = tf.constant('test', tf.string)
 
     net = lanenet_merge_model.LaneNet(phase=phase_tensor, net_flag='mobilenet')
@@ -161,9 +166,11 @@ def test_lanenet(image_path, weights_path, use_gpu, save_dir):
     return
 
 
-def test_lanenet_batch(image_dir, weights_path, batch_size, use_gpu, save_dir=None, encoder="vgg"):
+def test_lanenet_batch(image_dir, weights_path, batch_size, use_gpu, ignore_labels_path, save_dir=None, encoder="vgg"):
     """
 
+    :param encoder:
+    :param ignore_labels_path:
     :param image_dir:
     :param weights_path:
     :param batch_size:
@@ -178,7 +185,8 @@ def test_lanenet_batch(image_dir, weights_path, batch_size, use_gpu, save_dir=No
                       glob.glob('{:s}/**/*.png'.format(image_dir), recursive=True) + \
                       glob.glob('{:s}/**/*.jpeg'.format(image_dir), recursive=True)
 
-    input_tensor = tf.placeholder(dtype=tf.float32, shape=[None, 256, 512, 3], name='input_tensor')
+    input_tensor = tf.placeholder(dtype=tf.float32, shape=[None, CFG.TRAIN.IMG_HEIGHT, CFG.TRAIN.IMG_WIDTH, 3],
+                                  name='input_tensor')
     phase_tensor = tf.constant('test', tf.string)
 
     net = lanenet_merge_model.LaneNet(phase=phase_tensor, net_flag=encoder)
@@ -209,7 +217,7 @@ def test_lanenet_batch(image_dir, weights_path, batch_size, use_gpu, save_dir=No
     sess_config.gpu_options.allow_growth = CFG.TRAIN.TF_ALLOW_GROWTH
     sess_config.gpu_options.allocator_type = 'BFC'
 
-    ignore_labels = cv2.imread('/media/remus/datasets/AVMSnapshots/AVM/ignore_labels.png')
+    ignore_labels = cv2.imread(ignore_labels_path)
     ignore_labels = cv2.cvtColor(ignore_labels, cv2.COLOR_BGR2GRAY)
 
     sess = tf.Session(config=sess_config)
@@ -226,8 +234,9 @@ def test_lanenet_batch(image_dir, weights_path, batch_size, use_gpu, save_dir=No
             image_path_epoch = image_path_list[epoch * batch_size:(epoch + 1) * batch_size]
             image_list_epoch = [cv2.imread(tmp, cv2.IMREAD_COLOR) for tmp in image_path_epoch]
             image_vis_list = image_list_epoch
-            image_list_epoch = [cv2.resize(tmp, (512, 256), interpolation=cv2.INTER_LINEAR)
-                                for tmp in image_list_epoch]
+            image_list_epoch = [
+                cv2.resize(tmp, (CFG.TRAIN.IMG_WIDTH, CFG.TRAIN.IMG_HEIGHT), interpolation=cv2.INTER_LINEAR)
+                for tmp in image_list_epoch]
 
             if encoder == "mobilenet":
                 image_list_epoch = [tmp / 128.0 - 1.0 for tmp in image_list_epoch]
@@ -276,14 +285,14 @@ def test_lanenet_batch(image_dir, weights_path, batch_size, use_gpu, save_dir=No
                     plt.ioff()
 
                 if save_dir is not None:
-                    # mask_image = cv2.addWeighted(image_vis_list[index], 1.0, mask_image, 1.0, 0)
+                    mask_image = cv2.addWeighted(image_vis_list[index], 1.0, mask_image, 1.0, 0)
                     image_name = ops.split(image_path_epoch[index])[1]
                     image_save_path = ops.join(save_dir + "/image", image_name)
                     mask_save_path = ops.join(save_dir + "/mask", image_name)
-                    prob_save_path = ops.join(save_dir + "/prob", image_name)
+                    prob_save_path = ops.join(save_dir + "/prev_binary", image_name)
                     embedding_save_path = ops.join(save_dir + "/embedding", image_name)
                     cv2.imwrite(mask_save_path, binary_seg_image * 255)
-                    cv2.imwrite(prob_save_path,  prob_seg_image * 255)
+                    cv2.imwrite(prob_save_path, prob_seg_image * 255)
                     cv2.imwrite(image_save_path, mask_image)
                     cv2.imwrite(embedding_save_path, _embedding_image[:, :, (2, 1, 0)])
                     # cv2.imwrite(embedding_save_path + "_", _embedding_image[:, :, (3, 2, 1)])
@@ -307,7 +316,7 @@ if __name__ == '__main__':
 
     image_save_path = ops.join(args.save_dir + "/image")
     mask_save_path = ops.join(args.save_dir + "/mask")
-    prob_save_path = ops.join(args.save_dir + "/prob")
+    prob_save_path = ops.join(args.save_dir + "/prev_binary")
     embedding_save_path = ops.join(args.save_dir + "/embedding")
     if not ops.exists(image_save_path):
         os.makedirs(image_save_path)
@@ -322,4 +331,4 @@ if __name__ == '__main__':
         # test hnet model on a batch of image
         test_lanenet_batch(image_dir=args.image_path, weights_path=args.weights_path,
                            save_dir=args.save_dir, use_gpu=args.use_gpu, batch_size=args.batch_size,
-                           encoder=args.encoder)
+                           encoder=args.encoder, ignore_labels_path=args.ignore_labels_path)

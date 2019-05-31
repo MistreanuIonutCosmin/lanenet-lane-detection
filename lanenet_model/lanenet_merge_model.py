@@ -103,9 +103,9 @@ class LaneNet(cnn_basenet.CNNBaseModel):
             pix_embedding = inference_ret['deconv']
             # 像素嵌入
 
-
             # 计算二值分割损失函数
             decode_logits = inference_ret['logits']
+            decode_logits_dup = inference_ret['prev_logits']
 
             zeros = tf.zeros(tf.shape(binary_label))
             zeros = tf.cast(zeros, tf.int64)
@@ -127,6 +127,8 @@ class LaneNet(cnn_basenet.CNNBaseModel):
 
             binary_segmenatation_loss = tf.losses.sparse_softmax_cross_entropy(
                 labels=binary_label_f, logits=decode_logits, weights=inverse_weights)
+            binary_segmenatation_loss_dup = tf.losses.sparse_softmax_cross_entropy(
+                labels=binary_label_f, logits=decode_logits_dup, weights=inverse_weights)
             binary_segmenatation_loss = tf.reduce_mean(binary_segmenatation_loss)
 
             # 计算discriminative loss
@@ -160,6 +162,7 @@ class LaneNet(cnn_basenet.CNNBaseModel):
                 reg_loss = tf.add(reg_loss_encode, reg_loss_decode, name="reg_loss")
 
                 tf.losses.add_loss(binary_segmenatation_loss, "binary_segmenatation_loss")
+                tf.losses.add_loss(binary_segmenatation_loss_dup, "binary_segmenatation_loss_dup")
                 tf.losses.add_loss(disc_loss, "disc_loss")
                 tf.losses.add_loss(reg_loss, "reg_loss")
 
@@ -195,11 +198,12 @@ class LaneNet(cnn_basenet.CNNBaseModel):
 
             # 像素嵌入
             decode_logits = inference_ret['logits']
+            decode_logits_dup = inference_ret['prev_logits']
 
             prob_seg_ret = tf.nn.softmax(logits=decode_logits)
             binary_seg_ret = tf.argmax(prob_seg_ret, axis=-1)
 
-            return binary_seg_ret, pix_embedding, prob_seg_ret
+            return binary_seg_ret, pix_embedding, decode_logits_dup
 
 
 if __name__ == '__main__':

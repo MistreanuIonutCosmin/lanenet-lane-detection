@@ -44,10 +44,12 @@ def init_args():
     parser.add_argument('--weights_path', type=str, help='The pretrained weights path')
     parser.add_argument('--my_checkpoint', type=str,
                         help='If the checkpoints is saved by me or not (different variable names)', default="true")
-    parser.add_argument('--model_save_dir', type=str, help='model dir', default='./model/mobilenet_preTuS_merged')
-    parser.add_argument('--tboard_save_dir', type=str, help='tboard dir', default='./tboard/mobilenet_preTuS_merged')
+    parser.add_argument('--model_save_dir', type=str, help='model dir',
+                        default='./model/tuSimple_new_arch')
+    parser.add_argument('--tboard_save_dir', type=str, help='tboard dir',
+                        default='./tboard/tuSimple_new_arch')
     parser.add_argument('--ignore_labels_path', type=str, help='path to ignore labels mask',
-                        default='./ignore_labels_AVM.png')
+                        default='./ignore_labels_white.png')
 
     return parser.parse_args()
 
@@ -145,9 +147,9 @@ def train_net(dataset_dir, weights_path=None, net_flag='vgg', save_dir="./logs/t
     else:
         from correct_path_saver import restore_from_classification_checkpoint_fn, get_variables_available_in_checkpoint
         if weights_path is not None:
-            # var_map = restore_from_classification_checkpoint_fn("lanenet_model/inference")
+            var_map = restore_from_classification_checkpoint_fn("lanenet_model/inference")
             available_var_map = (get_variables_available_in_checkpoint(
-                tf.global_variables(), weights_path, include_global_step=False))
+                var_map, weights_path, include_global_step=True))
 
             init_saver = tf.train.Saver(available_var_map)
         else:
@@ -217,8 +219,8 @@ def train_net(dataset_dir, weights_path=None, net_flag='vgg', save_dir="./logs/t
             tf.logging.info('Restore model from last model checkpoint {:s}'.format(weights_path))
             init_saver.restore(sess=sess, save_path=weights_path)
 
-            assign_op = global_step.assign(0)
-            sess.run(assign_op)
+            # assign_op = global_step.assign(0)
+            # sess.run(assign_op)
 
         # 加载预训练参数
         if net_flag == 'vgg' and weights_path is None:
@@ -252,7 +254,6 @@ def train_net(dataset_dir, weights_path=None, net_flag='vgg', save_dir="./logs/t
 
                 # gt_imgs = [tmp - VGG_MEAN for tmp in gt_imgs]
                 gt_imgs = [tmp / 128.0 - 1.0 for tmp in gt_imgs]
-
 
                 binary_gt_labels = [np.expand_dims(tmp, axis=-1) for tmp in binary_gt_labels]
 

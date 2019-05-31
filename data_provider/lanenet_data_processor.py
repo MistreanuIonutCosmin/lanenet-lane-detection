@@ -77,6 +77,15 @@ class DataSet(object):
         self._gt_label_binary_list = new_gt_label_binary_list
         self._gt_label_instance_list = new_gt_label_instance_list
 
+    @staticmethod
+    def random_flip(batch_size, images, binaries, instances):
+
+        for i in range(batch_size):
+            if np.random.random() < 0.5:
+                images[i] = cv2.flip(images[i], 1)
+                binaries[i] = cv2.flip(binaries[i], 1)
+                instances[i] = cv2.flip(instances[i], 1)
+
     def next_batch(self, batch_size, ignore_label_mask, ignore_label=255):
         """
 
@@ -105,13 +114,10 @@ class DataSet(object):
             gt_label_binary_list = self._gt_label_binary_list[idx_start:idx_end]
             gt_label_instance_list = self._gt_label_instance_list[idx_start:idx_end]
 
-
             gt_imgs = []
             gt_labels_binary = []
             gt_labels_instance = []
             # print("img", list(map(lambda x: x.split("/")[7].split("_")[0], gt_img_list)), np.shape(gt_imgs))
-
-
 
             for gt_img_path in gt_img_list:
                 gt_img = cv2.imread(gt_img_path, cv2.IMREAD_COLOR)
@@ -138,6 +144,7 @@ class DataSet(object):
                 label_img = cv2.imread(gt_label_path, cv2.IMREAD_UNCHANGED)
                 gt_labels_instance.append(label_img)
 
+            self.random_flip(batch_size, gt_imgs, gt_labels_binary, gt_labels_instance)
 
             self._next_batch_loop_count += 1
             return gt_imgs, gt_labels_binary, gt_labels_instance

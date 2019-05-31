@@ -18,6 +18,8 @@ import shutil
 import cv2
 import numpy as np
 
+IMG_WIDTH = 512
+IMG_HEIGHT = 288
 
 def init_args():
     """
@@ -62,6 +64,7 @@ def process_json_file(json_file_path, src_dir, ori_dst_dir, binary_dst_dir, inst
             image_name_new = '{:s}.png'.format('{:d}'.format(line_index + image_nums).zfill(4))
 
             src_image = cv2.imread(image_path, cv2.IMREAD_COLOR)
+
             dst_binary_image = np.zeros([src_image.shape[0], src_image.shape[1]], np.uint8)
             dst_instance_image = np.zeros([src_image.shape[0], src_image.shape[1]], np.uint8)
 
@@ -90,6 +93,10 @@ def process_json_file(json_file_path, src_dir, ori_dst_dir, binary_dst_dir, inst
             dst_binary_image_path = ops.join(binary_dst_dir, image_name_new)
             dst_instance_image_path = ops.join(instance_dst_dir, image_name_new)
             dst_rgb_image_path = ops.join(ori_dst_dir, image_name_new)
+
+            dst_binary_image = cv2.resize(dst_binary_image, (IMG_WIDTH, IMG_HEIGHT), interpolation=cv2.INTER_LINEAR)
+            dst_instance_image = cv2.resize(dst_instance_image, (IMG_WIDTH, IMG_HEIGHT), interpolation=cv2.INTER_LINEAR)
+            src_image = cv2.resize(src_image, (IMG_WIDTH, IMG_HEIGHT), interpolation=cv2.INTER_LINEAR)
 
             cv2.imwrite(dst_binary_image_path, dst_binary_image)
             cv2.imwrite(dst_instance_image_path, dst_instance_image)
