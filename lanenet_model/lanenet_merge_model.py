@@ -13,8 +13,10 @@
 import tensorflow as tf
 
 from encoder_decoder_model import vgg_encoder
+from encoder_decoder_model import aspp_mobilenet_encoder
 from encoder_decoder_model import mobilenet_encoder
 from encoder_decoder_model import fcn_decoder
+from encoder_decoder_model import aspp_mobilenet_decoder
 from encoder_decoder_model import dense_encoder
 from encoder_decoder_model import cnn_basenet
 from lanenet_model import lanenet_discriminative_loss
@@ -36,12 +38,18 @@ class LaneNet(cnn_basenet.CNNBaseModel):
             self._encoder = vgg_encoder.VGG16Encoder(phase=phase)
         elif self._net_flag == 'mobilenet':
             self._encoder = mobilenet_encoder.Mobilenet(phase=phase)
+        elif self._net_flag == 'aspp_mobilenet':
+            self._encoder = aspp_mobilenet_encoder.ASPP_Mobilenet(phase=phase)
         elif self._net_flag == 'dense':
             self._encoder = dense_encoder.DenseEncoder(l=20, growthrate=8,
                                                        with_bc=True,
                                                        phase=phase,
                                                        n=5)
-        self._decoder = fcn_decoder.FCNDecoder(phase=phase)
+
+        if self._net_flag == 'aspp_mobilenet':
+            self._decoder = aspp_mobilenet_decoder.ASPP_Decoder(phase=phase)
+        else:
+            self._decoder = fcn_decoder.FCNDecoder(phase=phase)
         return
 
     def __str__(self):
@@ -78,12 +86,17 @@ class LaneNet(cnn_basenet.CNNBaseModel):
                                                   decode_layer_list=['Dense_Block_5',
                                                                      'Dense_Block_4',
                                                                      'Dense_Block_3'])
+                return decode_ret
             elif self._net_flag.lower() == 'mobilenet':
                 decode_ret = self._decoder.decode(input_tensor_dict=encode_ret,
                                                   name='decode',
                                                   decode_layer_list=['layer_18',
                                                                      'layer_14',
                                                                      'layer_7'])
+                return decode_ret
+            elif self._net_flag.lower() == 'aspp_mobilenet':
+                decode_ret = self._decoder.decode(input_tensor_dict=encode_ret,
+                                                  name="decode")
                 return decode_ret
 
     def compute_loss(self, input_tensor, binary_label, instance_label, ignore_label, name):

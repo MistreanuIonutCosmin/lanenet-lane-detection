@@ -10,8 +10,7 @@ import get_segmentation_mask_from_json as gs
 from sklearn.linear_model import LinearRegression
 
 HEIGHTS = [250, 300, 350, 400]
-H_SAMPLES = np.array(
-    [160, 170, 180, 190, 200, 210, 220, 230, 240, 250, 260, 270, 280, 290, 300, 310, 320, 330, 340, 350, 360,
+H_SAMPLES = np.array([160, 170, 180, 190, 200, 210, 220, 230, 240, 250, 260, 270, 280, 290, 300, 310, 320, 330, 340, 350, 360,
      370, 380, 390, 400, 410, 420, 430, 440, 450, 460, 470, 480, 490, 500, 510, 520, 530, 540, 550, 560, 570,
      580, 590, 600, 610, 620, 630, 640, 650, 660, 670, 680, 690, 700, 710])
 lr = LinearRegression()
@@ -80,7 +79,7 @@ def get_line_representation(mask, line_value):
     for h in H_SAMPLES:
         indices = np.where(mask[h] == line_value)
         if len(indices[0]) > 0:
-            line.append(indices[0][int(len(indices[0]) / 2)])
+            line.append(int(indices[0][int(len(indices[0]) / 2)]))
         else:
             line.append(-2)
 
@@ -198,7 +197,7 @@ if __name__ == '__main__':
 
     ignore_mask = cv2.imread("/media/remus/datasets/AVMSnapshots/AVM/ignore_labels.png")
     ignore_mask = cv2.cvtColor(ignore_mask, cv2.COLOR_RGB2GRAY)
-    ignore_mask = cv2.resize(ignore_mask, (1280, 720), interpolation=cv2.INTER_NEAREST)
+    ignore_mask = cv2.resize(ignore_mask, (993, 720), interpolation=cv2.INTER_NEAREST)
 
     image_path = sys.argv[1]
     tusimple_path = sys.argv[2]
@@ -222,7 +221,7 @@ if __name__ == '__main__':
         image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
         image[ignore_mask == 0] = 0
 
-        image = cv2.resize(image, (1280, 720), interpolation=cv2.INTER_NEAREST)
+        image = cv2.resize(image, (993, 720), interpolation=cv2.INTER_NEAREST)
         image_lines = get_json_representation(image, image_name)
 
         if not os.path.exists(tusimple_path):
@@ -230,7 +229,7 @@ if __name__ == '__main__':
 
         cv2.imwrite(tusimple_path + image_name, image)
 
-        image_dict["h_samples"] = list(H_SAMPLES)
+        image_dict["h_samples"] = list(map(int, H_SAMPLES))
         image_dict["lines"] = image_lines
         image_dict["raw_file"] = image_name
 

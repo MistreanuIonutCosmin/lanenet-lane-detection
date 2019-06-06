@@ -41,19 +41,19 @@ def init_args():
     """
     parser = argparse.ArgumentParser()
     parser.add_argument('--image_path', type=str, help='The image path or the src image save dir',
-                        default='/media/remus/3D_GT_extractor/190422_3D_gt_extractor/01_simulator/source_code/simulator/AVMSnapshots/test/')
+                        default='/media/remus/datasets/AVMSnapshots/AVM/val_images/')
     # default = '/media/remus/datasets/AVMSnapshots/AVM/val_images/0021_AVMFrontCamera.png')
     parser.add_argument('--weights_path', type=str, help='The model weights path',
-                        default='/home/remusm/projects/laneNet/model/preTuS_mergedB_dupLoss_flip/mobilenet_lanenet_2019-05-28-17-18-07.ckpt-144000')
+                        default='/home/remusm/projects/laneNet/model/AVM_preTS_new_arch_2/mobilenet_lanenet_2019-06-04-17-51-27.ckpt-184000')
     # default='/media/remus/projects/lanenet-lane-detection/weights/AVM_ignore_label/tusimple_lanenet_vgg_2019-03-28-15-42-02.ckpt-200000')
     parser.add_argument('--encoder', type=str, help='If use gpu set 1 or 0 instead', default="mobilenet")
     parser.add_argument('--is_batch', type=str, help='If test a batch of images', default='true')
-    parser.add_argument('--batch_size', type=int, help='The batch size of the test images', default=32)
+    parser.add_argument('--batch_size', type=int, help='The batch size of the test images', default=4)
     parser.add_argument('--save_dir', type=str, help='Test result image save dir',
-                        default='/media/remus/3D_GT_extractor/190422_3D_gt_extractor/01_simulator/source_code/simulator/AVMSnapshots/out_test/')
+                        default='/media/remus/datasets/AVMSnapshots/test_models/AVM_new_arch_val_2/')
     parser.add_argument('--use_gpu', type=int, help='If use gpu set 1 or 0 instead', default=1)
     parser.add_argument('--ignore_labels_path', type=str, help='path to ignore labels mask',
-                        default='./ignore_labels (copy).png')
+                        default='./ignore_labels_AVM.png')
 
     return parser.parse_args()
 

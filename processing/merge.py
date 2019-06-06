@@ -6,10 +6,10 @@ import os
 dir = '/media/remus/datasets/AVMSnapshots/'
 
 if __name__ == "__main__":
-    path1 = "/media/remus/datasets/AVMSnapshots/AVM/mobilenet_pTuS_dup_deconv/image"
-    path2 = "/media/remus/datasets/AVMSnapshots/AVM/mobilenet_tuS_pre_val_newGT/image"
+    path1 = "/media/remus/datasets/AVMSnapshots/test_models/duplicate_loss_flip_resize/image"
+    path2 = "/media/remus/datasets/AVMSnapshots/test_models/AVM_new_arch_val/image"
     # path3 = "/media/remus/datasets/AVMSnapshots/AVM/output_val/tusimple/4lanes_5lanes/"
-    output = "/media/remus/datasets/AVMSnapshots/AVM/newGT_asym"
+    output = "/media/remus/datasets/AVMSnapshots/test_models/merge_concat_branches_new_pretrain"
 
     if not os.path.exists(output):
         os.makedirs(output)
