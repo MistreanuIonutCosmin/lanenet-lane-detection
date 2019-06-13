@@ -75,7 +75,7 @@ class LaneNetCluster(object):
         :param prediction:
         :return:
         """
-        db = DBSCAN(eps=0.7, min_samples=200).fit(prediction)
+        db = DBSCAN(eps=0.7, min_samples=150).fit(prediction)
         db_labels = db.labels_
         unique_labels = np.unique(db_labels)
         unique_labels = [tmp for tmp in unique_labels if tmp != -1]

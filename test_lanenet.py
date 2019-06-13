@@ -44,13 +44,13 @@ def init_args():
                         default='/media/remus/datasets/AVMSnapshots/AVM/val_images/')
     # default = '/media/remus/datasets/AVMSnapshots/AVM/val_images/0021_AVMFrontCamera.png')
     parser.add_argument('--weights_path', type=str, help='The model weights path',
-                        default='/home/remusm/projects/laneNet/model/AVM_preTS_new_arch_2/mobilenet_lanenet_2019-06-04-17-51-27.ckpt-184000')
+                        default='/home/remusm/projects/laneNet/model/AVM_preTS_new_arch_ASPP_3/aspp_mobilenet_lanenet_2019-06-11-18-49-43.ckpt-196000')
     # default='/media/remus/projects/lanenet-lane-detection/weights/AVM_ignore_label/tusimple_lanenet_vgg_2019-03-28-15-42-02.ckpt-200000')
-    parser.add_argument('--encoder', type=str, help='If use gpu set 1 or 0 instead', default="mobilenet")
+    parser.add_argument('--encoder', type=str, help='If use gpu set 1 or 0 instead', default="aspp_mobilenet")
     parser.add_argument('--is_batch', type=str, help='If test a batch of images', default='true')
-    parser.add_argument('--batch_size', type=int, help='The batch size of the test images', default=4)
+    parser.add_argument('--batch_size', type=int, help='The batch size of the test images', default=1)
     parser.add_argument('--save_dir', type=str, help='Test result image save dir',
-                        default='/media/remus/datasets/AVMSnapshots/test_models/AVM_new_arch_val_2/')
+                        default='/media/remus/datasets/AVMSnapshots/test_models/AVM_ASPP_3/')
     parser.add_argument('--use_gpu', type=int, help='If use gpu set 1 or 0 instead', default=1)
     parser.add_argument('--ignore_labels_path', type=str, help='path to ignore labels mask',
                         default='./ignore_labels_AVM.png')
@@ -88,7 +88,7 @@ def test_lanenet(image_path, weights_path, use_gpu, save_dir):
     image = cv2.imread(image_path, cv2.IMREAD_COLOR)
     image_vis = image
     image = cv2.resize(image, (CFG.TRAIN.IMG_WIDTH, CFG.TRAIN.IMG_HEIGHT), interpolation=cv2.INTER_LINEAR)
-    image = image / 128.0 - 1.0
+    # image = image / 128.0 - 1.0
     log.info('图像读取完毕, 耗时: {:.5f}s'.format(time.time() - t_start))
 
     input_tensor = tf.placeholder(dtype=tf.float32, shape=[1, CFG.TRAIN.IMG_HEIGHT, CFG.TRAIN.IMG_WIDTH, 3],
@@ -238,8 +238,9 @@ def test_lanenet_batch(image_dir, weights_path, batch_size, use_gpu, ignore_labe
                 cv2.resize(tmp, (CFG.TRAIN.IMG_WIDTH, CFG.TRAIN.IMG_HEIGHT), interpolation=cv2.INTER_LINEAR)
                 for tmp in image_list_epoch]
 
-            if encoder == "mobilenet":
-                image_list_epoch = [tmp / 128.0 - 1.0 for tmp in image_list_epoch]
+            if encoder == "aspp_mobilenet":
+                pass
+                # image_list_epoch = [tmp / 128.0 - 1.0 for tmp in image_list_epoch]
             else:
                 image_list_epoch = [tmp - VGG_MEAN for tmp in image_list_epoch]
             t_cost = time.time() - t_start

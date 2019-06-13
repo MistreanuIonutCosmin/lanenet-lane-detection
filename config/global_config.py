@@ -48,7 +48,7 @@ __C.TRAIN.IMG_HEIGHT = 288
 # Set the image width
 __C.TRAIN.IMG_WIDTH = 416
 # Atrous rates
-__C.TRAIN.ATROUS_RATES = [6, 12, 18]
+__C.TRAIN.ATROUS_RATES = [4, 7, 10]
 __C.TRAIN.OUTPUT_STRIDE = 16
 
 # Test options

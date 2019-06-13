@@ -48,14 +48,13 @@ class ASPP_Decoder(cnn_basenet.CNNBaseModel):
         ret = dict()
 
         with tf.variable_scope(name):
-            # score stage 1
-            input_tensor = input_tensor_dict
+            # deconv_final = self.deconv2d(inputdata=input_tensor_dict, out_channel=64, kernel_size=8,
+            #                              stride=4, use_bias=False, name='deconv_final')
 
-            score = self.conv2d(inputdata=input_tensor, out_channel=64,
-                                kernel_size=1, use_bias=False, name='score_origin')
-
-            deconv_final = self.deconv2d(inputdata=score, out_channel=64, kernel_size=8,
-                                         stride=4, use_bias=False, name='deconv_final')
+            from deeplab_util.model import _resize_bilinear
+            resize_final = _resize_bilinear(input_tensor_dict, [288, 416])
+            deconv_final = self.conv2d(inputdata=resize_final, out_channel=64,
+                                      kernel_size=1, use_bias=False, name='deconv_final')
 
             score_final = self.conv2d(inputdata=deconv_final, out_channel=2,
                                       kernel_size=1, use_bias=False, name='score_final')

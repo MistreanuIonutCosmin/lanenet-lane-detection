@@ -179,7 +179,7 @@ class LaneNet(cnn_basenet.CNNBaseModel):
                 tf.losses.add_loss(disc_loss, "disc_loss")
                 tf.losses.add_loss(reg_loss, "reg_loss")
 
-                total_loss = 0.6 * binary_segmenatation_loss + 0.4 * disc_loss + reg_loss * 0.001
+                total_loss = 0.5 * binary_segmenatation_loss + 0.6 * disc_loss + reg_loss * 0.001
                 tf.losses.add_loss(total_loss, "total_loss")
 
             # tf.Print(total_loss, [tf.shape(total_loss)], message="total_loss: ")

@@ -50,7 +50,7 @@ flags.DEFINE_string('model_variant', 'mobilenet_v2', 'DeepLab model variant.')
 flags.DEFINE_multi_float('image_pyramid', None,
                          'Input scales for multi-scale feature extraction.')
 
-flags.DEFINE_boolean('add_image_level_feature', True,
+flags.DEFINE_boolean('add_image_level_feature', False,
                      'Add image level feature.')
 
 flags.DEFINE_multi_integer(

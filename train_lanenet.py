@@ -184,9 +184,9 @@ def init_args():
     parser.add_argument('--my_checkpoint', type=str,
                         help='If the checkpoints is saved by me or not (different variable names)', default="true")
     parser.add_argument('--model_save_dir', type=str, help='model dir',
-                        default='./model/AVM_preTS_new_arch_ASPP')
+                        default='./model/AVM_preTS_new_arch_ASPP_3')
     parser.add_argument('--tboard_save_dir', type=str, help='tboard dir',
-                        default='./tboard/AVM_preTS_new_arch_ASPP')
+                        default='./tboard/AVM_preTS_new_arch_ASPP_3')
     parser.add_argument('--ignore_labels_path', type=str, help='path to ignore labels mask',
                         default='./ignore_labels_AVM.png')
 
@@ -284,7 +284,7 @@ def train_net(dataset_dir, weights_path=None, net_flag='vgg', save_dir="./logs/t
     if my_checkpoint == "true":
         # init_saver = tf.train.Saver()
         available_var_map = (get_variables_available_in_checkpoint(
-            var_map, weights_path, include_global_step=True))
+            tf.global_variables(), weights_path, include_global_step=True))
 
         init_saver = tf.train.Saver(available_var_map)
     else:
@@ -395,7 +395,7 @@ def train_net(dataset_dir, weights_path=None, net_flag='vgg', save_dir="./logs/t
                     ignore_label=255)
 
                 # gt_imgs = [tmp - VGG_MEAN for tmp in gt_imgs]
-                gt_imgs = [tmp / 128.0 - 1.0 for tmp in gt_imgs]
+                # gt_imgs = [tmp / 128.0 - 1.0 for tmp in gt_imgs]
 
                 binary_gt_labels = [np.expand_dims(tmp, axis=-1) for tmp in binary_gt_labels]
 
@@ -425,14 +425,14 @@ def train_net(dataset_dir, weights_path=None, net_flag='vgg', save_dir="./logs/t
                 tf.logging.error('binary cost is: {:.5f}'.format(binary_loss))
                 tf.logging.error('instance cost is: {:.5f}'.format(instance_loss))
                 # cv2.imwrite('nan_image.png', gt_imgs[0] + VGG_MEAN)
-                cv2.imwrite('nan_image.png', (gt_imgs[0] + 1.0) * 128)
+                cv2.imwrite('nan_image.png', gt_imgs[0])
                 cv2.imwrite('nan_instance_label.png', instance_gt_labels[0])
                 cv2.imwrite('nan_binary_label.png', binary_gt_labels[0] * 255)
                 return
 
             if epoch % 100 == 0:
                 # cv2.imwrite('nan_image.png', gt_imgs[0] + VGG_MEAN)
-                cv2.imwrite('image.png', (gt_imgs[0] + 1.0) * 128)
+                cv2.imwrite('image.png', gt_imgs[0])
                 cv2.imwrite('binary_label.png', binary_gt_labels[0] * 255)
                 cv2.imwrite('instance_label.png', instance_gt_labels[0])
                 cv2.imwrite('binary_seg_img.png', binary_seg_img[0] * 255)
@@ -452,7 +452,7 @@ def train_net(dataset_dir, weights_path=None, net_flag='vgg', save_dir="./logs/t
                     = val_dataset.next_batch(CFG.TRAIN.VAL_BATCH_SIZE, ignore_label_mask=ignore_label_mask)
 
                 # gt_imgs_val = [tmp - VGG_MEAN for tmp in gt_imgs_val]
-                gt_imgs_val = [tmp / 128.0 - 1.0 for tmp in gt_imgs_val]
+                # gt_imgs_val = [tmp / 128.0 - 1.0 for tmp in gt_imgs_val]
 
                 binary_gt_labels_val = [np.expand_dims(tmp, axis=-1) for tmp in binary_gt_labels_val]
             phase_val = 'test'

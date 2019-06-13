@@ -55,7 +55,7 @@ class ASPP_Mobilenet(cnn_basenet.CNNBaseModel):
                                                                model_options,
                                                                None,
                                                                weight_decay=0.0001,
-                                                               is_training=False,
-                                                               fine_tune_batch_norm=False)
+                                                               is_training=True,
+                                                               fine_tune_batch_norm=True)
 
         return outputs_to_scales_to_logits
